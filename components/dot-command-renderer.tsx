@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, memo, useCallback } from "react"
 import { Button } from "./ui/button"
-import { Maximize2, Download, ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
+import { Maximize2, Download, ZoomIn, ZoomOut } from "lucide-react"
 
 interface DotCommandRendererProps {
     dot: string
@@ -110,7 +110,6 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
                                 dblClickZoomEnabled: true,
                                 mouseWheelZoomEnabled: true,
                                 preventMouseEventsDefault: false,
-                                zoomOnMouseWheel: true,
                                 onZoom: (level: number) => {
                                     console.log("🔍 Zoom level:", level)
                                 }
@@ -207,18 +206,6 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
         }
     }, [])
 
-    const handleReset = useCallback(() => {
-        if (panZoomRef.current) {
-            try {
-                panZoomRef.current.resetZoom()
-                panZoomRef.current.center()
-                console.log("🔄 DotCommandRenderer: Reset zoom and pan")
-            } catch (err) {
-                console.error("❌ DotCommandRenderer: Error resetting:", err)
-            }
-        }
-    }, [])
-
     const handleDownload = useCallback(() => {
         if (svgContent) {
             const blob = new Blob([svgContent], { type: 'image/svg+xml' })
@@ -247,7 +234,7 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
     return (
         <div className={`relative w-full h-full ${className}`}>
             {/* Controls */}
-            <div className="absolute top-2 right-2 z-10 flex gap-2">
+            <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-2 items-end">
                 <Button
                     variant="outline"
                     size="sm"
@@ -274,15 +261,6 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
                     className="bg-white/80 backdrop-blur-sm"
                 >
                     <Maximize2 className="h-4 w-4" />
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleReset}
-                    disabled={!panZoomRef.current}
-                    className="bg-white/80 backdrop-blur-sm"
-                >
-                    <RotateCcw className="h-4 w-4" />
                 </Button>
                 <Button
                     variant="outline"

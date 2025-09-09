@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useLayoutEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -44,6 +44,7 @@ export default function LogicaEditor() {
   const [hasGeneratedGraph, setHasGeneratedGraph] = useState(false)
   const [showDotModal, setShowDotModal] = useState(false)
   const [logicaResults, setLogicaResults] = useState<any>(null)
+  const [lockedViewportHeight, setLockedViewportHeight] = useState<number | null>(null)
   const { toast } = useToast()
 
   // Detect user's operating system for comment shortcut (client-side only)
@@ -52,6 +53,13 @@ export default function LogicaEditor() {
   useEffect(() => {
     const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform)
     setCommentShortcut(isMac ? 'Cmd+/' : 'Ctrl+/')
+  }, [])
+
+  // Lock the layout to the initial viewport height on first mount
+  useLayoutEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLockedViewportHeight(window.innerHeight)
+    }
   }, [])
 
   // Load examples on component mount
@@ -226,13 +234,8 @@ export default function LogicaEditor() {
 
       console.log("⚙️ Calling generateGraphviz function...")
       await generateGraphviz(domainLanguage, visualLanguage)
-
-      toast({
-        title: "Graph Generated!",
-        description: "Your logic graph has been successfully generated.",
-      })
-
-      console.log("🎉 Graph generation completed and toast shown!")
+      // Success toast removed per request
+      console.log("🎉 Graph generation completed")
     } catch (error: any) {
       console.error("❌ Error during graph generation:", error)
 
@@ -333,9 +336,12 @@ export default function LogicaEditor() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col">
+    <div
+      className="overflow-y-auto bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col"
+      style={{ height: lockedViewportHeight ? `${lockedViewportHeight}px` : '100dvh' }}
+    >
       {/* Enhanced Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-sm">
+      <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-sm flex-shrink-0">
         <div className="mx-auto w-[80%] px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
@@ -365,32 +371,6 @@ export default function LogicaEditor() {
             {/* Action Buttons */}
             <div className="flex items-center gap-3">
               <Button
-                onClick={handleRunQuery}
-                disabled={isGenerating}
-                className="gap-2 h-12 px-6 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #5BA3E8 0%, #5FA85F 50%, #E6C85C 100%)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)'
-                }}
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <PlayIcon />
-                    Generate Graph
-                  </>
-                )}
-              </Button>
-              <Button
                 variant="outline"
                 onClick={handleGitHub}
                 className="gap-2 h-12 px-4 rounded-xl border-slate-200 hover:border-green-300 hover:bg-green-50 hover:text-green-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
@@ -404,19 +384,18 @@ export default function LogicaEditor() {
       </header>
 
       {/* Main Content */}
-      <div className="mx-auto w-[80%] px-6 py-6 flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+      <div className="mx-auto w-[80%] px-6 py-6 flex-1 overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full overflow-hidden">
           {/* Left Panel - Code Editors */}
-          <div className="lg:col-span-5 flex flex-col space-y-6 h-full">
+          <div className="lg:col-span-5 flex flex-col space-y-6 h-full min-h-0">
             {/* Domain Language Section */}
-            <div className="h-[calc(50%-12px)] bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+            <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
               <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#66B2EE' }}></div>
                       <Label className="text-sm font-semibold text-slate-800">Domain Language</Label>
-                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">{commentShortcut} to comment</span>
                     </div>
                     <p className="text-xs text-slate-600 mt-1">Define your domain facts and relationships</p>
                   </div>
@@ -424,9 +403,9 @@ export default function LogicaEditor() {
                   {/* Example Selector */}
                   <div className="ml-4">
                     <Select value={selectedExample} onValueChange={handleExampleChange}>
-                      <SelectTrigger className="w-48 h-10 rounded-lg border-slate-200 bg-white transition-all duration-200 shadow-sm hover:bg-blue-100 hover:border-blue-300">
-                        <SelectValue placeholder="Choose example">
-                          {selectedExample ? examples.find(ex => ex.id === selectedExample)?.name : "Choose example"}
+                      <SelectTrigger size="sm" className="w-auto min-w-0 h-8 px-2 rounded-md border-slate-200 bg-white transition-all duration-200 shadow-sm hover:bg-blue-100 hover:border-blue-300">
+                        <SelectValue placeholder="Example">
+                          {selectedExample ? examples.find(ex => ex.id === selectedExample)?.name : "Example"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="rounded-lg border-slate-200 shadow-xl">
@@ -445,17 +424,18 @@ export default function LogicaEditor() {
                 </div>
               </div>
               <div className="flex-1 p-6 overflow-hidden">
-                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-y-auto overflow-x-hidden overscroll-contain">
                   <Textarea
                     value={domainLanguage}
                     onChange={(e) => setDomainLanguage(e.target.value)}
                     onKeyDown={(e) => handleCommentToggle(e, domainLanguage, setDomainLanguage)}
                     placeholder={`# Define your domain facts here
+# Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
 Argument("a");
 Argument("b");
 Attacks("a", "b");
 # This is a comment`}
-                    className="w-full h-full resize-none font-mono text-sm border-0 bg-transparent focus-visible:ring-0 placeholder:text-slate-400 leading-relaxed rounded-xl p-4"
+                    className="w-full h-full resize-none font-mono text-sm border-0 bg-transparent focus-visible:ring-0 placeholder:text-slate-400 leading-tight rounded-xl p-2"
                     style={{
                       minHeight: '200px',
                       maxHeight: '100%',
@@ -468,25 +448,25 @@ Attacks("a", "b");
             </div>
 
             {/* Visual Language Section */}
-            <div className="h-[calc(50%-12px)] bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+            <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
               <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-purple-50 border-b border-slate-200 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6BB56B' }}></div>
                   <Label className="text-sm font-semibold text-slate-800">Visual Language</Label>
-                  <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">{commentShortcut} to comment</span>
                 </div>
                 <p className="text-xs text-slate-600 mt-1">Configure visualization settings</p>
               </div>
               <div className="flex-1 p-6 overflow-hidden">
-                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-y-auto overflow-x-hidden overscroll-contain">
                   <Textarea
                     value={visualLanguage}
                     onChange={(e) => setVisualLanguage(e.target.value)}
                     onKeyDown={(e) => handleCommentToggle(e, visualLanguage, setVisualLanguage)}
-                    placeholder={`Node( node_id: x, label: x, shape: "circle", border: "solid", fontsize: "14") :- Argument(x);
-Edge(source_id: source, target_id: target, color: "black", style: "solid", arrowhead: "normal", arrowtail: "") :- Attacks(source, target);
+                    placeholder={`# Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
+Node( node_id: x, label: \"x\", shape: \"circle\", border: \"solid\", fontsize: \"14\") :- Argument(x);
+Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Attacks(source, target);
 # Configuration comments`}
-                    className="w-full h-full resize-none font-mono text-sm border-0 bg-transparent focus-visible:ring-0 placeholder:text-slate-400 leading-relaxed rounded-xl p-4"
+                    className="w-full h-full resize-none font-mono text-sm border-0 bg-transparent focus-visible:ring-0 placeholder:text-slate-400 leading-tight rounded-xl p-2"
                     style={{
                       minHeight: '200px',
                       maxHeight: '100%',
@@ -500,7 +480,7 @@ Edge(source_id: source, target_id: target, color: "black", style: "solid", arrow
           </div>
 
           {/* Right Panel - Graph Visualization */}
-          <div className="lg:col-span-7 h-full bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+          <div className="lg:col-span-7 h-full min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
             <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-indigo-50 border-b border-slate-200 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -513,6 +493,34 @@ Edge(source_id: source, target_id: target, color: "black", style: "solid", arrow
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleRunQuery}
+                    disabled={isGenerating}
+                    size="sm"
+                    className="gap-2 h-8 px-3 rounded-lg text-white font-medium shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #5BA3E8 0%, #5FA85F 50%, #E6C85C 100%)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)'
+                    }}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <PlayIcon />
+                        Generate Graph
+                      </>
+                    )}
+                  </Button>
+
                   <Dialog open={showDotModal} onOpenChange={setShowDotModal}>
                     <DialogTrigger asChild>
                       <Button
@@ -581,7 +589,7 @@ Edge(source_id: source, target_id: target, color: "black", style: "solid", arrow
                 {isGenerating ? 'Generating graph...' : 'Interactive graph with zoom and pan controls'}
               </p>
             </div>
-            <div className="flex-1 p-6 overflow-hidden">
+            <div className="flex-1 p-6 overflow-auto">
               <div className="h-full rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/30 shadow-inner overflow-hidden">
                 <div className="graphviz-container h-full flex items-center justify-center">
                   {hasGeneratedGraph ? (
