@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="./public/logo.png" alt="DecViz Logo" width="150">
+    <img src="./public/logo-white.png" alt="DecViz Logo" width="150">
     <h1 align="center">DecViz</h1>
 </div>
 
