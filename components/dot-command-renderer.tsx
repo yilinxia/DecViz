@@ -233,6 +233,17 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
         }
     }, [svgContent])
 
+
+    const handleRefresh = useCallback(() => {
+        setError(null)
+        setIsLoading(true)
+        // Force re-render by clearing the container and triggering useEffect
+        if (containerRef.current) {
+            containerRef.current.innerHTML = ''
+        }
+        // The useEffect will automatically re-run due to the dot dependency
+    }, [])
+
     return (
         <div className={`relative w-full h-full ${className}`}>
             {/* Controls */}

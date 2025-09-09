@@ -177,8 +177,13 @@ export async function POST(request: NextRequest) {
 
         // Create temporary Logica file
         // Filter out engine specifications that might cause parsing errors
+        // Enforce SQLite engine for local execution
         const cleanVisualLanguage = (visualLanguage || '').replace(/@Engine\([^)]+\);/g, '').trim()
-        const logicaContent = `${domainLanguage}\n\n${cleanVisualLanguage}`
+        const logicaContent = `@Engine("sqlite");
+${domainLanguage}
+
+${cleanVisualLanguage}`
+        // logicaContent is now defined above with @Engine("sqlite")
         const tempFilePath = path.join('/tmp', `decviz_${Date.now()}.l`)
 
         // Write to temporary file
