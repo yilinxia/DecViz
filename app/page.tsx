@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import LogicaEditor from "@/components/logica-editor"
 import { Label } from "@/components/ui/label"
 import DotCommandRenderer from "@/components/dot-command-renderer"
 import { useToast } from "@/components/ui/use-toast"
@@ -34,7 +35,7 @@ const DownloadIcon = () => (
 )
 
 
-export default function LogicaEditor() {
+export default function DecVizApp() {
   const [selectedExample, setSelectedExample] = useState<string>("")
   const [domainLanguage, setDomainLanguage] = useState("")
   const [visualLanguage, setVisualLanguage] = useState("")
@@ -813,7 +814,12 @@ export default function LogicaEditor() {
             {/* Logo and Title */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Refresh"
+                  onClick={() => window.location.reload()}
+                  className="relative rounded-xl hover:cursor-pointer focus:outline-none focus:ring-0"
+                >
                   <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg">
                     <Image
                       src="/logo.png"
@@ -823,7 +829,7 @@ export default function LogicaEditor() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                </div>
+                </button>
                 <div>
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
                     DecViz
@@ -890,10 +896,10 @@ export default function LogicaEditor() {
                 </div>
               </div>
               <div className="flex-1 p-6 overflow-hidden">
-                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-y-auto overflow-x-hidden overscroll-contain">
-                  <Textarea
+                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                  <LogicaEditor
                     value={domainLanguage}
-                    onChange={(e) => setDomainLanguage(e.target.value)}
+                    onChange={setDomainLanguage}
                     onKeyDown={(e) => handleCommentToggle(e, domainLanguage, setDomainLanguage)}
                     placeholder={`# Define your domain facts here
 # Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
@@ -901,11 +907,10 @@ Argument("a");
 Argument("b");
 Attacks("a", "b");
 # This is a comment`}
-                    className="w-full h-full resize-none font-mono text-sm border-0 bg-transparent focus-visible:ring-0 placeholder:text-slate-400 leading-tight rounded-xl p-2"
+                    className="w-full h-full rounded-xl"
                     style={{
                       minHeight: '200px',
-                      maxHeight: '100%',
-                      colorScheme: 'dark'
+                      maxHeight: '100%'
                     }}
                     spellCheck={false}
                   />
@@ -923,20 +928,19 @@ Attacks("a", "b");
                 <p className="text-xs text-slate-600 mt-1">Configure visualization settings</p>
               </div>
               <div className="flex-1 p-6 overflow-hidden">
-                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-y-auto overflow-x-hidden overscroll-contain">
-                  <Textarea
+                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                  <LogicaEditor
                     value={visualLanguage}
-                    onChange={(e) => setVisualLanguage(e.target.value)}
+                    onChange={setVisualLanguage}
                     onKeyDown={(e) => handleCommentToggle(e, visualLanguage, setVisualLanguage)}
                     placeholder={`# Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
 Node( node_id: x, label: \"x\", shape: \"circle\", border: \"solid\", fontsize: \"14\") :- Argument(x);
 Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Attacks(source, target);
 # Configuration comments`}
-                    className="w-full h-full resize-none font-mono text-sm border-0 bg-transparent focus-visible:ring-0 placeholder:text-slate-400 leading-tight rounded-xl p-2"
+                    className="w-full h-full rounded-xl"
                     style={{
                       minHeight: '200px',
-                      maxHeight: '100%',
-                      colorScheme: 'dark'
+                      maxHeight: '100%'
                     }}
                     spellCheck={false}
                   />
