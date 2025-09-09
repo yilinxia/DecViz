@@ -505,14 +505,13 @@ function evaluateLogicaDirectly(rules: LogicaRule[]): any {
                 const result: any = {}
                 for (const headArg of nodeRule.head.args) {
                     if (typeof headArg === 'object' && headArg.name) {
-                        if (typeof headArg.value === 'string') {
-                            // Variable reference
-                            const varIndex = bodyArgs.indexOf(headArg.value)
-                            if (varIndex >= 0) {
-                                result[headArg.name] = fact[varIndex]
-                            }
+                        // Check if this is a variable reference by seeing if it matches any body argument
+                        const varIndex = bodyArgs.indexOf(headArg.value)
+                        if (varIndex >= 0) {
+                            // Variable reference - substitute with actual value
+                            result[headArg.name] = fact[varIndex]
                         } else {
-                            // Literal value
+                            // Literal value - use as is
                             result[headArg.name] = headArg.value
                         }
                     }
@@ -542,14 +541,13 @@ function evaluateLogicaDirectly(rules: LogicaRule[]): any {
                 const result: any = {}
                 for (const headArg of edgeRule.head.args) {
                     if (typeof headArg === 'object' && headArg.name) {
-                        if (typeof headArg.value === 'string') {
-                            // Variable reference
-                            const varIndex = bodyArgs.indexOf(headArg.value)
-                            if (varIndex >= 0) {
-                                result[headArg.name] = fact[varIndex]
-                            }
+                        // Check if this is a variable reference by seeing if it matches any body argument
+                        const varIndex = bodyArgs.indexOf(headArg.value)
+                        if (varIndex >= 0) {
+                            // Variable reference - substitute with actual value
+                            result[headArg.name] = fact[varIndex]
                         } else {
-                            // Literal value
+                            // Literal value - use as is
                             result[headArg.name] = headArg.value
                         }
                     }
