@@ -6,22 +6,10 @@ dependencies:
   # Node.js (npm comes bundled with Node.js)
   - nodejs=20.19.4
   
-  # Python and Logica
-  - python=3.11
-  - pip
-  
   # Essential development tools
   - git
   - curl
   - make
-  
-  # Graphviz for DOT rendering
-  - graphviz
-
-# Pip dependencies
-  - pip:
-    - logica
-    - pandas
 
 # Environment variables
 variables:

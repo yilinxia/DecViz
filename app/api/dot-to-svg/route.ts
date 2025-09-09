@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        console.log('🔄 API: Converting DOT to SVG using dot command')
+        console.log('🔄 API: Converting DOT to SVG using graphviz-cli')
         console.log('📝 API: DOT input:', dot.substring(0, 100) + '...')
 
-        // Use dot command to generate SVG
-        const { stdout, stderr } = await execAsync(`echo '${dot.replace(/'/g, "'\\''")}' | dot -Tsvg`)
+        // Use graphviz-cli to generate SVG (pure JavaScript solution)
+        const { stdout, stderr } = await execAsync(`echo '${dot.replace(/'/g, "'\\''")}' | npx graphviz-cli -Tsvg`)
 
         if (stderr) {
             console.error('❌ API: dot command stderr:', stderr)
