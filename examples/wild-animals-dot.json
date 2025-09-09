@@ -1,7 +1,7 @@
 {
-    "id": "wild-animals-fd-value",
-    "name": "Wild Animals FDV",
-    "description": "Argumentation framework of wild animals (attacks network)",
+    "id": "wild-animals-dot",
+    "name": "Wild Animals DOT",
+    "description": "Argumentation framework of wild animals (force-directed)",
     "domainLanguageLines": [
         "# Wild Animals",
         "Attacks(\"B\",\"A\");",
@@ -37,18 +37,14 @@
         "Attacks(\"U\",\"T\");",
         "Attacks(\"V\",\"U\");",
         "",
-        "Argument(x):- Attacks(x,y) | Attacks(y,x);",
-        "Accepted(x) :- Argument(x), ~Attacks(y,x);",
-        "Defeated(x) :- Attacks(y,x), Accepted(y);"
+        "Argument(x):- Attacks(x,y) | Attacks(y,x);"
     ],
     "visualLanguageLines": [
         "# Graph properties",
-        "Graph( id: \"af\", rankdir: \"BT\", engine: \"fdp\");",
+        "Graph( id: \"af\", rankdir: \"BT\", engine: \"dot\");",
         "",
         "# Node definitions - map domain arguments to visual nodes",
-        "Node( node_id: x, label: x, shape: \"circle\", style: \"filled\", color:\"#40cfff\", fontsize: \"14\") :- Accepted(x);",
-        "",
-        "Node( node_id: x, label: x, shape: \"circle\", style: \"filled\", color:\"#ffb763\", fontsize: \"14\") :- Defeated(x);",
+        "Node( node_id: x, label: x, shape: \"circle\", style: \"filled\", color:\"lightgray\", fontsize: \"14\") :- Argument(x);",
         "",
         "# Edge definitions - map domain attacks to visual edges",
         "Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Attacks(source, target);"
