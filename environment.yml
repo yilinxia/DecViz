@@ -14,6 +14,9 @@ dependencies:
   - git
   - curl
   - make
+  
+  # Graphviz for DOT rendering
+  - graphviz
 
 # Pip dependencies
   - pip:
