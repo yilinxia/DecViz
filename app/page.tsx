@@ -40,6 +40,8 @@ export default function LogicaEditor() {
   const [visualLanguage, setVisualLanguage] = useState("")
   const [examples, setExamples] = useState<Example[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [globalWorker, setGlobalWorker] = useState<Worker | null>(null)
+  const [workerReady, setWorkerReady] = useState(false)
   const [graphvizOutput, setGraphvizOutput] = useState("")
   const [hasGeneratedGraph, setHasGeneratedGraph] = useState(false)
   const [showDotModal, setShowDotModal] = useState(false)
@@ -69,6 +71,76 @@ export default function LogicaEditor() {
   useLayoutEffect(() => {
     if (typeof window !== 'undefined') {
       setLockedViewportHeight(window.innerHeight)
+    }
+  }, [])
+
+  // Initialize global worker on mount
+  useEffect(() => {
+    const initializeWorker = async () => {
+      try {
+        console.log("🔄 Initializing global Logica worker...")
+        const pickWorkerUrl = async (): Promise<string> => {
+          const tryUrls = ['/logica.js', '/logica/logica.js']
+          for (const u of tryUrls) {
+            try {
+              const res = await fetch(u, { method: 'HEAD' })
+              if (res.ok) return u
+            } catch { }
+          }
+          return '/logica.js'
+        }
+
+        const workerUrl = await pickWorkerUrl()
+        const worker = new Worker(workerUrl, { type: 'classic' })
+
+        const waitForReady = () => new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            worker.removeEventListener('message', onMsg as any)
+            reject(new Error('Worker init timeout'))
+          }, 60000)
+
+          const onMsg = (evt: MessageEvent) => {
+            const d = evt.data
+            if (!d) return
+            if (d.type === 'ready' || (d.type === 'pong' && d.initialized)) {
+              clearTimeout(timeout)
+              worker.removeEventListener('message', onMsg as any)
+              resolve()
+            }
+          }
+
+          worker.addEventListener('message', onMsg as any)
+          const pinger = setInterval(() => {
+            try { worker.postMessage({ type: 'ping' }) } catch { }
+          }, 1000)
+
+          const stop = () => clearInterval(pinger)
+          const originalResolve = resolve
+          resolve = () => { stop(); originalResolve() }
+          const originalReject = reject
+          reject = (e?: any) => { stop(); originalReject(e) }
+
+          try { worker.postMessage({ type: 'ping' }) } catch { }
+        })
+
+        await waitForReady()
+        console.log("✅ Global Logica worker ready!")
+        setGlobalWorker(worker)
+        setWorkerReady(true)
+
+      } catch (error) {
+        console.error("❌ Failed to initialize global worker:", error)
+        setWorkerReady(false)
+      }
+    }
+
+    initializeWorker()
+
+    // Cleanup on unmount
+    return () => {
+      if (globalWorker) {
+        try { globalWorker.terminate() } catch { }
+      }
     }
   }, [])
 
@@ -195,59 +267,13 @@ export default function LogicaEditor() {
       throw new Error("Domain language is empty. Please enter some Logica code in the Domain Language field.")
     }
 
+    if (!globalWorker || !workerReady) {
+      throw new Error("Logica worker not ready. Please wait a moment and try again.")
+    }
+
     // Join program (engine is injected by worker)
     const program = `${domain}\n\n${visual}`
-
-    // Lazily create a single worker instance per call (with path fallback)
-    const pickWorkerUrl = async (): Promise<string> => {
-      const tryUrls = ['/logica.js', '/logica/logica.js']
-      for (const u of tryUrls) {
-        try {
-          const res = await fetch(u, { method: 'HEAD' })
-          if (res.ok) return u
-        } catch { }
-      }
-      // Default to root path
-      return '/logica.js'
-    }
-    const workerUrl = await pickWorkerUrl()
-    const worker = new Worker(workerUrl, { type: 'classic' })
-
-    // Wait for worker ready
-    const waitForReady = () => new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        worker.removeEventListener('message', onMsg as any)
-        reject(new Error('Logica worker init timeout'))
-      }, 60000)
-      const onMsg = (evt: MessageEvent) => {
-        const d = evt.data
-        if (!d) return
-        if (d.type === 'ready') {
-          clearTimeout(timeout)
-          worker.removeEventListener('message', onMsg as any)
-          resolve()
-        }
-        if (d.type === 'pong' && d.initialized) {
-          clearTimeout(timeout)
-          worker.removeEventListener('message', onMsg as any)
-          resolve()
-        }
-      }
-      worker.addEventListener('message', onMsg as any)
-      // Periodically ping until initialized
-      const pinger = setInterval(() => {
-        try { worker.postMessage({ type: 'ping' }) } catch { }
-      }, 1000)
-      // Stop pinger when resolved/rejected
-      const stop = () => clearInterval(pinger)
-      const originalResolve = resolve
-      resolve = () => { stop(); originalResolve() }
-      const originalReject = reject
-      reject = (e?: any) => { stop(); originalReject(e) }
-      // Immediate first ping
-      try { worker.postMessage({ type: 'ping' }) } catch { }
-    })
-    await waitForReady()
+    const worker = globalWorker
 
     // Helper: parse HTML table returned by worker to {columns, rows}
     const parseAsciiTable = (text: string): { columns: string[]; rows: string[][] } => {
@@ -657,9 +683,8 @@ export default function LogicaEditor() {
     } catch (error: any) {
       console.error('❌ Error running Logica via worker:', error)
       throw new Error(`Logica execution failed: ${error.message}`)
-    } finally {
-      try { worker.terminate() } catch { }
     }
+    // Note: Don't terminate the global worker - reuse it
   }
 
   const handleRunQuery = async () => {
@@ -927,6 +952,11 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isGenerating ? 'animate-pulse' : ''}`} style={{ backgroundColor: isGenerating ? '#EDD266' : '#EDD266' }}></div>
                   <Label className="text-sm font-semibold text-slate-800">Graph Visualization</Label>
+                  {!workerReady && (
+                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                      Initializing...
+                    </span>
+                  )}
                   {isGenerating && (
                     <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
                       Generating...
@@ -936,7 +966,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={handleRunQuery}
-                    disabled={isGenerating}
+                    disabled={isGenerating || !workerReady}
                     size="sm"
                     className="gap-2 h-8 px-3 rounded-lg text-white font-medium shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
@@ -983,8 +1013,8 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                               <div className={`w-2 h-2 rounded-full ${graphStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                               <span className="text-sm font-semibold text-slate-800">Graph</span>
                               <span className={`text-xs px-2 py-1 rounded-full font-medium ${graphStatus === 'OK'
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-red-100 text-red-700'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
                                 }`}>
                                 {graphStatus}
                               </span>
@@ -1013,8 +1043,8 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                               <div className={`w-2 h-2 rounded-full ${nodeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                               <span className="text-sm font-semibold text-slate-800">Node</span>
                               <span className={`text-xs px-2 py-1 rounded-full font-medium ${nodeStatus === 'OK'
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-red-100 text-red-700'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
                                 }`}>
                                 {nodeStatus}
                               </span>
@@ -1043,8 +1073,8 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                               <div className={`w-2 h-2 rounded-full ${edgeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                               <span className="text-sm font-semibold text-slate-800">Edge</span>
                               <span className={`text-xs px-2 py-1 rounded-full font-medium ${edgeStatus === 'OK'
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-red-100 text-red-700'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
                                 }`}>
                                 {edgeStatus}
                               </span>
