@@ -247,7 +247,17 @@ def run_logica_command(logica_path, file_path, predicate):
         return {"columns": [], "rows": []}
 
 # Main execution
+# Try to find Logica executable
 logica_path = '/opt/miniconda3/envs/decviz/bin/logica'
+if not os.path.exists(logica_path):
+    # Try to find logica in PATH
+    try:
+        result = subprocess.run(['which', 'logica'], capture_output=True, text=True)
+        if result.returncode == 0:
+            logica_path = result.stdout.strip()
+    except:
+        pass
+
 file_path = sys.argv[1]
 
 results = {}
@@ -285,7 +295,25 @@ print(json.dumps(results))
 
         // Execute Python script using conda environment
         console.log('🐍 Executing Python script to parse Logica output...')
-        const pythonResult = execSync(`/opt/miniconda3/envs/decviz/bin/python ${pythonScriptPath} ${tempFilePath}`, {
+        
+        // Try to find Python executable in conda environment
+        let pythonPath = '/opt/miniconda3/envs/decviz/bin/python'
+        try {
+            // Check if the conda environment Python exists
+            execSync(`test -f ${pythonPath}`, { stdio: 'ignore' })
+        } catch {
+            // Fallback to system Python
+            try {
+                const systemPython = execSync('which python3', { encoding: 'utf8' }).trim()
+                pythonPath = systemPython
+                console.log('🔄 Using system Python:', pythonPath)
+            } catch {
+                pythonPath = 'python3'
+                console.log('🔄 Using default python3 command')
+            }
+        }
+        
+        const pythonResult = execSync(`${pythonPath} ${pythonScriptPath} ${tempFilePath}`, {
             encoding: 'utf8',
             timeout: 10000
         })
