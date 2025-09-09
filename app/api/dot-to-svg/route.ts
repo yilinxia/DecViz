@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { exec } from 'child_process'
-import { promisify } from 'util'
-
-const execAsync = promisify(exec)
+import { spawn } from 'child_process'
 
 export async function POST(request: NextRequest) {
     try {
@@ -18,32 +15,37 @@ export async function POST(request: NextRequest) {
         console.log('🔄 API: Converting DOT to SVG using graphviz-cli')
         console.log('📝 API: DOT input:', dot.substring(0, 100) + '...')
 
-        // Use graphviz-cli to generate SVG (pure JavaScript solution)
-        // Fix: Use the locally installed graphviz binary instead of npx to avoid directory creation issues
-        const { stdout, stderr } = await execAsync(`echo '${dot.replace(/'/g, "'\\''")}' | ./node_modules/.bin/graphviz -Tsvg`)
+        // Use graphviz-cli to generate SVG using spawn for better security and reliability
+        const svg = await new Promise<string>((resolve, reject) => {
+            const proc = spawn('./node_modules/.bin/graphviz', ['-Tsvg'])
 
-        if (stderr) {
-            console.error('❌ API: dot command stderr:', stderr)
-            // Sometimes dot outputs warnings to stderr but still produces valid SVG
-            if (!stdout || stdout.trim().length === 0) {
-                return NextResponse.json(
-                    { error: `dot command failed: ${stderr}` },
-                    { status: 500 }
-                )
-            }
-        }
+            let output = ''
+            let errorOutput = ''
 
-        if (!stdout || stdout.trim().length === 0) {
-            return NextResponse.json(
-                { error: 'No SVG output from dot command' },
-                { status: 500 }
-            )
-        }
+            proc.stdout.on('data', (chunk) => (output += chunk.toString()))
+            proc.stderr.on('data', (chunk) => (errorOutput += chunk.toString()))
 
-        console.log('✅ API: SVG generated successfully, length:', stdout.length)
-        console.log('📄 API: SVG preview:', stdout.substring(0, 200) + '...')
+            proc.on('close', (code) => {
+                if (code === 0 && output.trim()) {
+                    resolve(output)
+                } else {
+                    reject(new Error(errorOutput || 'Graphviz-cli failed'))
+                }
+            })
 
-        return NextResponse.json({ svg: stdout })
+            proc.on('error', (error) => {
+                reject(new Error(`Failed to start graphviz-cli: ${error.message}`))
+            })
+
+            // Write the DOT string to stdin
+            proc.stdin.write(dot)
+            proc.stdin.end()
+        })
+
+        console.log('✅ API: SVG generated successfully, length:', svg.length)
+        console.log('📄 API: SVG preview:', svg.substring(0, 200) + '...')
+
+        return NextResponse.json({ svg })
 
     } catch (error) {
         console.error('❌ API: Error converting DOT to SVG:', error)
