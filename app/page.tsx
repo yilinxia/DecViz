@@ -43,7 +43,17 @@ export default function LogicaEditor() {
   const [graphvizOutput, setGraphvizOutput] = useState("")
   const [hasGeneratedGraph, setHasGeneratedGraph] = useState(false)
   const [showDotModal, setShowDotModal] = useState(false)
+  const [showResultsModal, setShowResultsModal] = useState(false)
   const [logicaResults, setLogicaResults] = useState<any>(null)
+  const [rawGraphResult, setRawGraphResult] = useState<string>("")
+  const [rawNodeResult, setRawNodeResult] = useState<string>("")
+  const [rawEdgeResult, setRawEdgeResult] = useState<string>("")
+  const [graphStatus, setGraphStatus] = useState<string>("")
+  const [nodeStatus, setNodeStatus] = useState<string>("")
+  const [edgeStatus, setEdgeStatus] = useState<string>("")
+  const [graphError, setGraphError] = useState<string>("")
+  const [nodeError, setNodeError] = useState<string>("")
+  const [edgeError, setEdgeError] = useState<string>("")
   const [lockedViewportHeight, setLockedViewportHeight] = useState<number | null>(null)
   const { toast } = useToast()
 
@@ -180,44 +190,475 @@ export default function LogicaEditor() {
     console.log("📝 Input Domain Language:", domain)
     console.log("🎨 Input Visual Language:", visual)
 
-    // Check if domain language is empty
     if (!domain.trim()) {
       console.log("⚠️ Domain language is empty")
       throw new Error("Domain language is empty. Please enter some Logica code in the Domain Language field.")
     }
 
-    try {
-      // Call the API route to execute Logica
-      const response = await fetch('/api/logica', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          domainLanguage: domain,
-          visualLanguage: visual,
-        }),
-      })
+    // Join program (engine is injected by worker)
+    const program = `${domain}\n\n${visual}`
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to execute Logica')
+    // Lazily create a single worker instance per call (with path fallback)
+    const pickWorkerUrl = async (): Promise<string> => {
+      const tryUrls = ['/logica.js', '/logica/logica.js']
+      for (const u of tryUrls) {
+        try {
+          const res = await fetch(u, { method: 'HEAD' })
+          if (res.ok) return u
+        } catch { }
+      }
+      // Default to root path
+      return '/logica.js'
+    }
+    const workerUrl = await pickWorkerUrl()
+    const worker = new Worker(workerUrl, { type: 'classic' })
+
+    // Wait for worker ready
+    const waitForReady = () => new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        worker.removeEventListener('message', onMsg as any)
+        reject(new Error('Logica worker init timeout'))
+      }, 60000)
+      const onMsg = (evt: MessageEvent) => {
+        const d = evt.data
+        if (!d) return
+        if (d.type === 'ready') {
+          clearTimeout(timeout)
+          worker.removeEventListener('message', onMsg as any)
+          resolve()
+        }
+        if (d.type === 'pong' && d.initialized) {
+          clearTimeout(timeout)
+          worker.removeEventListener('message', onMsg as any)
+          resolve()
+        }
+      }
+      worker.addEventListener('message', onMsg as any)
+      // Periodically ping until initialized
+      const pinger = setInterval(() => {
+        try { worker.postMessage({ type: 'ping' }) } catch { }
+      }, 1000)
+      // Stop pinger when resolved/rejected
+      const stop = () => clearInterval(pinger)
+      const originalResolve = resolve
+      resolve = () => { stop(); originalResolve() }
+      const originalReject = reject
+      reject = (e?: any) => { stop(); originalReject(e) }
+      // Immediate first ping
+      try { worker.postMessage({ type: 'ping' }) } catch { }
+    })
+    await waitForReady()
+
+    // Helper: parse HTML table returned by worker to {columns, rows}
+    const parseAsciiTable = (text: string): { columns: string[]; rows: string[][] } => {
+      const lines = (text || '').split('\n')
+      let headerLine = ''
+      let dataStartIndex = -1
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (line.startsWith('|') && line.includes('|') && !line.startsWith('+')) {
+          headerLine = line
+          for (let j = i + 1; j < lines.length; j++) {
+            if (lines[j].trim().startsWith('+')) {
+              dataStartIndex = j + 1
+              break
+            }
+          }
+          break
+        }
+      }
+      if (!headerLine || dataStartIndex === -1) return { columns: [], rows: [] }
+      const columns = headerLine.replace(/^\||\|$/g, '').split('|').map(c => c.trim()).filter(Boolean)
+      const dataLines = lines.slice(dataStartIndex).filter(l => {
+        const t = l.trim()
+        return t && !t.startsWith('+') && t.includes('|')
+      })
+      const rows = dataLines.map(l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim()))
+      return { columns, rows }
+    }
+
+    const parseHtmlTable = (html: string): { columns: string[]; rows: string[][] } => {
+      try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(html, 'text/html')
+        const table = doc.querySelector('table')
+        if (!table) return parseAsciiTable(html)
+        const headerCells = table.querySelectorAll('thead tr th, tr th')
+        const columns: string[] = []
+        headerCells.forEach((th) => columns.push((th.textContent || '').trim()))
+        // Fallback if no thead
+        if (columns.length === 0) {
+          // Some tables omit thead; use first row cells as headers
+          const firstRowCells = table.querySelectorAll('tr:first-child th, tr:first-child td')
+          firstRowCells.forEach((cell) => columns.push((cell.textContent || '').trim()))
+        }
+        const rows: string[][] = []
+        const allRows = table.querySelectorAll('tr')
+        allRows.forEach((tr, idx) => {
+          // Skip first row if we synthesized headers from it
+          const tds = tr.querySelectorAll('td')
+          if (tds.length > 0) {
+            if (columns.length && idx === 0) {
+              // If first row was used as header (td header case), skip pushing it as data
+              const firstRowCells = table.querySelectorAll('tr:first-child th, tr:first-child td')
+              if (firstRowCells.length === tds.length) return
+            }
+            rows.push(Array.from(tds).map((td) => (td.textContent || '').trim()))
+          }
+        })
+        if (columns.length === 0 || rows.length === 0) {
+          // Fallback to ASCII parser if HTML structure is not present
+          const parsed = parseAsciiTable(html)
+          if (parsed.columns.length || parsed.rows.length) return parsed
+        }
+        return { columns, rows }
+      } catch {
+        return parseAsciiTable(html)
+      }
+    }
+
+    // Helper: run a predicate via worker
+    const runPredicate = (predicate: string): Promise<{ status: string; result: string; error?: string }> => {
+      return new Promise((resolve, reject) => {
+        const onMessage = (event: MessageEvent) => {
+          const data = event.data
+          if (data.get && data.get('type') === 'run_predicate' && data.get('predicate') === predicate) {
+            worker.removeEventListener('message', onMessage as any)
+            const status = data.get('status')
+            const result = data.get('result')
+            const error = data.get('error_message')
+            console.log(`📥 Worker response for ${predicate}:`, { status, sample: (result || '').toString().slice(0, 200), error })
+            resolve({ status, result, error })
+          }
+        }
+        const onError = (err: any) => {
+          worker.removeEventListener('message', onMessage as any)
+          reject(err)
+        }
+        worker.addEventListener('message', onMessage as any)
+        worker.addEventListener('error', onError, { once: true })
+        worker.postMessage({ type: 'run_predicate', predicate, program, hide_error: true })
+      })
+    }
+
+    // Helper: column utilities
+    const hasColumn = (cols: string[], name: string) => cols.includes(name)
+    const getValue = (row: string[], cols: string[], name: string) => {
+      const i = cols.indexOf(name)
+      return i >= 0 ? row[i] : ''
+    }
+
+    // Build DOT from results (ported from API)
+    const compileToDot = (results: any): string => {
+      let dot = 'digraph G {\n'
+
+      // Graph properties
+      if (results.graph?.rows?.length) {
+        const gRow = results.graph.rows[0]
+        const gCols = results.graph.columns
+        if (hasColumn(gCols, 'rankdir')) {
+          const rankdir = getValue(gRow, gCols, 'rankdir')
+          if (rankdir) dot += `  rankdir=${rankdir};\n`
+        }
+      } else {
+        dot += '  rankdir=TB;\n'
       }
 
-      const { graphvizDot, logicaResults } = await response.json()
-      console.log("🎨 Received Graphviz DOT:", graphvizDot)
-      console.log("📊 Received Logica Results:", logicaResults)
+      // Extract common node attributes
+      if (results.nodes?.rows?.length) {
+        const nCols = results.nodes.columns
+        const commonNodeAttrs = new Map<string, string>()
+        const nodeSpecificAttrs = new Map<string, string[]>()
 
-      console.log("✅ Graph generation completed successfully!")
-      console.log("🔄 Setting graphvizOutput state with:", graphvizDot.substring(0, 100) + "...")
-      setGraphvizOutput(graphvizDot)
-      setLogicaResults(logicaResults)
+        // Collect all attributes for each node
+        results.nodes.rows.forEach((r: string[]) => {
+          const nodeId = getValue(r, nCols, 'node_id') || 'unknown'
+          const attrs: string[] = []
+
+          const attrMap: Record<string, string> = {}
+          if (hasColumn(nCols, 'shape')) {
+            const v = getValue(r, nCols, 'shape')
+            if (v) attrMap.shape = `"${v}"`
+          }
+          if (hasColumn(nCols, 'border')) {
+            const v = getValue(r, nCols, 'border')
+            if (v) attrMap.style = `"${v}"`
+          }
+          if (hasColumn(nCols, 'fontsize')) {
+            const v = getValue(r, nCols, 'fontsize')
+            if (v) attrMap.fontsize = v
+          }
+          if (hasColumn(nCols, 'fixedsize')) {
+            const v = getValue(r, nCols, 'fixedsize')
+            if (v) attrMap.fixedsize = v === 'true' ? 'true' : v
+          }
+          if (hasColumn(nCols, 'width')) {
+            const v = getValue(r, nCols, 'width')
+            if (v) attrMap.width = v
+          }
+          if (hasColumn(nCols, 'height')) {
+            const v = getValue(r, nCols, 'height')
+            if (v) attrMap.height = v
+          }
+          if (hasColumn(nCols, 'color')) {
+            const v = getValue(r, nCols, 'color')
+            if (v) {
+              attrMap.fillcolor = `"${v}"`
+              attrMap.style = '"filled"'
+            }
+          }
+
+          // Track common attributes
+          Object.entries(attrMap).forEach(([key, value]) => {
+            if (!commonNodeAttrs.has(key)) {
+              commonNodeAttrs.set(key, value)
+            } else if (commonNodeAttrs.get(key) !== value) {
+              commonNodeAttrs.delete(key) // Not common
+            }
+          })
+
+          // Store node-specific attributes
+          const nodeAttrs: string[] = []
+          if (hasColumn(nCols, 'label')) {
+            const v = getValue(r, nCols, 'label')
+            if (v) nodeAttrs.push(`label="${v}"`)
+          }
+          Object.entries(attrMap).forEach(([key, value]) => {
+            if (!commonNodeAttrs.has(key) || commonNodeAttrs.get(key) !== value) {
+              nodeAttrs.push(`${key}=${value}`)
+            }
+          })
+
+          nodeSpecificAttrs.set(nodeId, nodeAttrs)
+        })
+
+        // Output common node attributes
+        if (commonNodeAttrs.size > 0) {
+          dot += '\n  node [\n'
+          Array.from(commonNodeAttrs.entries()).forEach(([key, value]) => {
+            dot += `    ${key}=${value}\n`
+          })
+          dot += '  ];\n'
+        }
+
+        // Re-process nodes to exclude common attributes
+        const finalNodeAttrs = new Map<string, string[]>()
+        results.nodes.rows.forEach((r: string[]) => {
+          const nodeId = getValue(r, nCols, 'node_id') || 'unknown'
+          const attrs: string[] = []
+
+          if (hasColumn(nCols, 'label')) {
+            const v = getValue(r, nCols, 'label')
+            if (v) attrs.push(`label="${v}"`)
+          }
+
+          // Add non-common attributes
+          if (hasColumn(nCols, 'shape')) {
+            const v = getValue(r, nCols, 'shape')
+            if (v && (!commonNodeAttrs.has('shape') || commonNodeAttrs.get('shape') !== `"${v}"`)) {
+              attrs.push(`shape="${v}"`)
+            }
+          }
+          if (hasColumn(nCols, 'border')) {
+            const v = getValue(r, nCols, 'border')
+            if (v && (!commonNodeAttrs.has('style') || commonNodeAttrs.get('style') !== `"${v}"`)) {
+              attrs.push(`style="${v}"`)
+            }
+          }
+          if (hasColumn(nCols, 'fontsize')) {
+            const v = getValue(r, nCols, 'fontsize')
+            if (v && (!commonNodeAttrs.has('fontsize') || commonNodeAttrs.get('fontsize') !== v)) {
+              attrs.push(`fontsize="${v}"`)
+            }
+          }
+          if (hasColumn(nCols, 'fixedsize')) {
+            const v = getValue(r, nCols, 'fixedsize')
+            const normalizedV = v === 'true' ? 'true' : v
+            if (v && (!commonNodeAttrs.has('fixedsize') || commonNodeAttrs.get('fixedsize') !== normalizedV)) {
+              attrs.push(`fixedsize="${v}"`)
+            }
+          }
+          if (hasColumn(nCols, 'width')) {
+            const v = getValue(r, nCols, 'width')
+            if (v && (!commonNodeAttrs.has('width') || commonNodeAttrs.get('width') !== v)) {
+              attrs.push(`width="${v}"`)
+            }
+          }
+          if (hasColumn(nCols, 'height')) {
+            const v = getValue(r, nCols, 'height')
+            if (v && (!commonNodeAttrs.has('height') || commonNodeAttrs.get('height') !== v)) {
+              attrs.push(`height="${v}"`)
+            }
+          }
+          if (hasColumn(nCols, 'color')) {
+            const v = getValue(r, nCols, 'color')
+            if (v) {
+              if (!commonNodeAttrs.has('fillcolor') || commonNodeAttrs.get('fillcolor') !== `"${v}"`) {
+                attrs.push(`fillcolor="${v}"`)
+              }
+              if (!commonNodeAttrs.has('style') || commonNodeAttrs.get('style') !== '"filled"') {
+                attrs.push(`style="filled"`)
+              }
+            }
+          }
+
+          finalNodeAttrs.set(nodeId, attrs)
+        })
+
+        // Output nodes
+        dot += '\n'
+        Array.from(finalNodeAttrs.entries()).forEach(([nodeId, attrs]) => {
+          if (attrs.length > 0) {
+            dot += `  "${nodeId}" [${attrs.join(', ')}];\n`
+          } else {
+            dot += `  "${nodeId}";\n`
+          }
+        })
+      }
+
+      // Extract common edge attributes
+      if (results.edges?.rows?.length) {
+        const eCols = results.edges.columns
+        const commonEdgeAttrs = new Map<string, string>()
+
+        // First pass: find common attributes
+        results.edges.rows.forEach((r: string[]) => {
+          const attrMap: Record<string, string> = {}
+          if (hasColumn(eCols, 'color')) {
+            const v = getValue(r, eCols, 'color')
+            if (v) attrMap.color = `"${v}"`
+          }
+          if (hasColumn(eCols, 'style')) {
+            const v = getValue(r, eCols, 'style')
+            if (v) attrMap.style = `"${v}"`
+          }
+          if (hasColumn(eCols, 'arrowhead')) {
+            const v = getValue(r, eCols, 'arrowhead')
+            if (v) attrMap.arrowhead = `"${v}"`
+          }
+          if (hasColumn(eCols, 'arrowtail')) {
+            const v = getValue(r, eCols, 'arrowtail')
+            if (v) attrMap.arrowtail = `"${v}"`
+          }
+
+          Object.entries(attrMap).forEach(([key, value]) => {
+            if (!commonEdgeAttrs.has(key)) {
+              commonEdgeAttrs.set(key, value)
+            } else if (commonEdgeAttrs.get(key) !== value) {
+              commonEdgeAttrs.delete(key)
+            }
+          })
+        })
+
+        // Output common edge attributes
+        if (commonEdgeAttrs.size > 0) {
+          dot += '\n  edge [\n'
+          Array.from(commonEdgeAttrs.entries()).forEach(([key, value]) => {
+            dot += `    ${key}=${value}\n`
+          })
+          dot += '  ];\n'
+        }
+
+        // Output edges
+        dot += '\n'
+        results.edges.rows.forEach((r: string[]) => {
+          const s = getValue(r, eCols, 'source_id') || 'unknown'
+          const t = getValue(r, eCols, 'target_id') || 'unknown'
+          const attrs: string[] = []
+
+          // Add non-common attributes
+          if (hasColumn(eCols, 'color')) {
+            const v = getValue(r, eCols, 'color')
+            if (v && (!commonEdgeAttrs.has('color') || commonEdgeAttrs.get('color') !== `"${v}"`)) {
+              attrs.push(`color="${v}"`)
+            }
+          }
+          if (hasColumn(eCols, 'style')) {
+            const v = getValue(r, eCols, 'style')
+            if (v && (!commonEdgeAttrs.has('style') || commonEdgeAttrs.get('style') !== `"${v}"`)) {
+              attrs.push(`style="${v}"`)
+            }
+          }
+          if (hasColumn(eCols, 'arrowhead')) {
+            const v = getValue(r, eCols, 'arrowhead')
+            if (v && (!commonEdgeAttrs.has('arrowhead') || commonEdgeAttrs.get('arrowhead') !== `"${v}"`)) {
+              attrs.push(`arrowhead="${v}"`)
+            }
+          }
+          if (hasColumn(eCols, 'arrowtail')) {
+            const v = getValue(r, eCols, 'arrowtail')
+            if (v && (!commonEdgeAttrs.has('arrowtail') || commonEdgeAttrs.get('arrowtail') !== `"${v}"`)) {
+              attrs.push(`arrowtail="${v}"`)
+            }
+          }
+          if (hasColumn(eCols, 'label')) {
+            const v = getValue(r, eCols, 'label')
+            if (v) attrs.push(`label="${v}"`)
+          }
+
+          if (attrs.length > 0) {
+            dot += `  "${s}" -> "${t}" [${attrs.join(', ')}];\n`
+          } else {
+            dot += `  "${s}" -> "${t}";\n`
+          }
+        })
+      }
+
+      dot += '}'
+      return dot
+    }
+
+    try {
+      // Run predicates
+      const [graphRes, nodeRes, edgeRes] = await Promise.all([
+        runPredicate('Graph').catch(() => ({ status: 'error', result: '' })),
+        runPredicate('Node'),
+        runPredicate('Edge'),
+      ])
+
+      console.log('🔎 Worker results:', {
+        graph: { status: graphRes.status, sample: (graphRes.result || '').toString().slice(0, 200), error: graphRes.error },
+        node: { status: nodeRes.status, sample: (nodeRes.result || '').toString().slice(0, 200), error: nodeRes.error },
+        edge: { status: edgeRes.status, sample: (edgeRes.result || '').toString().slice(0, 200), error: edgeRes.error },
+      })
+
+      const results: any = {
+        graph: graphRes.status === 'OK' ? parseHtmlTable(graphRes.result) : { columns: [], rows: [] },
+        nodes: nodeRes.status === 'OK' ? parseHtmlTable(nodeRes.result) : { columns: [], rows: [] },
+        edges: edgeRes.status === 'OK' ? parseHtmlTable(edgeRes.result) : { columns: [], rows: [] },
+      }
+      setRawGraphResult(graphRes.result || '')
+      setRawNodeResult(nodeRes.result || '')
+      setRawEdgeResult(edgeRes.result || '')
+      setGraphStatus(graphRes.status)
+      setNodeStatus(nodeRes.status)
+      setEdgeStatus(edgeRes.status)
+      setGraphError(graphRes.error || '')
+      setNodeError(nodeRes.error || '')
+      setEdgeError(edgeRes.error || '')
+
+      console.log('🧩 Parsed results:', results)
+
+      const dot = compileToDot(results)
+
+      // Render via existing endpoint
+      const resp = await fetch('/api/dot-to-svg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dot }),
+      })
+      if (!resp.ok) {
+        const err = await resp.json()
+        throw new Error(err.error || 'Failed to generate SVG')
+      }
+      setGraphvizOutput(dot)
+      setLogicaResults(results)
       setHasGeneratedGraph(true)
-      console.log("✅ graphvizOutput state updated")
     } catch (error: any) {
-      console.error("❌ Error running Logica:", error)
-      // Throw the error so it can be caught by handleRunQuery
+      console.error('❌ Error running Logica via worker:', error)
       throw new Error(`Logica execution failed: ${error.message}`)
+    } finally {
+      try { worker.terminate() } catch { }
     }
   }
 
@@ -520,6 +961,114 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                       </>
                     )}
                   </Button>
+
+                  <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 h-8 px-3 rounded-lg border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
+                      >
+                        View Results
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                      <DialogHeader>
+                        <DialogTitle>Raw Logica Results</DialogTitle>
+                      </DialogHeader>
+                      <div className="mt-4 h-[60vh] overflow-auto space-y-4">
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${graphStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              <span className="text-sm font-semibold text-slate-800">Graph</span>
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${graphStatus === 'OK'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-red-100 text-red-700'
+                                }`}>
+                                {graphStatus}
+                              </span>
+                            </div>
+                          </div>
+                          {graphError && (
+                            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                              <div className="text-sm text-red-800 font-medium">Error:</div>
+                              <div className="text-sm text-red-600 mt-1">{graphError}</div>
+                            </div>
+                          )}
+                          <div className="p-0">
+                            {rawGraphResult ? (
+                              <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
+                                <pre className="p-4 whitespace-pre text-slate-700">{rawGraphResult}</pre>
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-slate-500 italic">No data</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-green-50 rounded-t-lg">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${nodeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              <span className="text-sm font-semibold text-slate-800">Node</span>
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${nodeStatus === 'OK'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-red-100 text-red-700'
+                                }`}>
+                                {nodeStatus}
+                              </span>
+                            </div>
+                          </div>
+                          {nodeError && (
+                            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                              <div className="text-sm text-red-800 font-medium">Error:</div>
+                              <div className="text-sm text-red-600 mt-1">{nodeError}</div>
+                            </div>
+                          )}
+                          <div className="p-0">
+                            {rawNodeResult ? (
+                              <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
+                                <pre className="p-4 whitespace-pre text-slate-700">{rawNodeResult}</pre>
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-slate-500 italic">No data</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-purple-50 rounded-t-lg">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${edgeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              <span className="text-sm font-semibold text-slate-800">Edge</span>
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${edgeStatus === 'OK'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-red-100 text-red-700'
+                                }`}>
+                                {edgeStatus}
+                              </span>
+                            </div>
+                          </div>
+                          {edgeError && (
+                            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                              <div className="text-sm text-red-800 font-medium">Error:</div>
+                              <div className="text-sm text-red-600 mt-1">{edgeError}</div>
+                            </div>
+                          )}
+                          <div className="p-0">
+                            {rawEdgeResult ? (
+                              <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
+                                <pre className="p-4 whitespace-pre text-slate-700">{rawEdgeResult}</pre>
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-slate-500 italic">No data</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
                   <Dialog open={showDotModal} onOpenChange={setShowDotModal}>
                     <DialogTrigger asChild>
