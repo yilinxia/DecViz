@@ -405,11 +405,11 @@ export default function LogicaEditor() {
 
       {/* Main Content */}
       <div className="mx-auto w-[80%] px-6 py-6 flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-200px)]">
           {/* Left Panel - Code Editors */}
           <div className="lg:col-span-5 flex flex-col space-y-6 h-full">
             {/* Domain Language Section */}
-            <div className="flex-1 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+            <div className="h-[calc(50%-12px)] bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
               <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div>
@@ -468,7 +468,7 @@ Attacks("a", "b");
             </div>
 
             {/* Visual Language Section */}
-            <div className="flex-1 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+            <div className="h-[calc(50%-12px)] bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
               <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-purple-50 border-b border-slate-200 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6BB56B' }}></div>

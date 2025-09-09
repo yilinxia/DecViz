@@ -321,8 +321,7 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
             {/* Graph container */}
             <div
                 ref={containerRef}
-                className="w-full h-full min-h-[400px] bg-white border border-gray-200 rounded-lg overflow-hidden"
-                style={{ minHeight: '400px' }}
+                className="w-full h-full bg-white border border-gray-200 rounded-lg overflow-hidden"
             />
         </div>
     )
