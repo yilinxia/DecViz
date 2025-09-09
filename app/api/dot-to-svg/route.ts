@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawn } from 'child_process'
+import { Graphviz } from '@hpcc-js/wasm'
 
 export async function POST(request: NextRequest) {
     try {
@@ -12,35 +12,12 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        console.log('🔄 API: Converting DOT to SVG using graphviz-cli')
+        console.log('🔄 API: Converting DOT to SVG using @hpcc-js/wasm')
         console.log('📝 API: DOT input:', dot.substring(0, 100) + '...')
 
-        // Use graphviz-cli to generate SVG using spawn for better security and reliability
-        const svg = await new Promise<string>((resolve, reject) => {
-            const proc = spawn('./node_modules/.bin/graphviz', ['-Tsvg'])
-
-            let output = ''
-            let errorOutput = ''
-
-            proc.stdout.on('data', (chunk) => (output += chunk.toString()))
-            proc.stderr.on('data', (chunk) => (errorOutput += chunk.toString()))
-
-            proc.on('close', (code) => {
-                if (code === 0 && output.trim()) {
-                    resolve(output)
-                } else {
-                    reject(new Error(errorOutput || 'Graphviz-cli failed'))
-                }
-            })
-
-            proc.on('error', (error) => {
-                reject(new Error(`Failed to start graphviz-cli: ${error.message}`))
-            })
-
-            // Write the DOT string to stdin
-            proc.stdin.write(dot)
-            proc.stdin.end()
-        })
+        // Use @hpcc-js/wasm for pure JavaScript/WASM graphviz rendering
+        const graphviz = await Graphviz.load()
+        const svg = graphviz.dot(dot)
 
         console.log('✅ API: SVG generated successfully, length:', svg.length)
         console.log('📄 API: SVG preview:', svg.substring(0, 200) + '...')
