@@ -23,7 +23,41 @@ export async function GET(request: NextRequest) {
             try {
                 const filePath = path.join(examplesDir, filename)
                 const fileContent = fs.readFileSync(filePath, 'utf8')
-                const example = JSON.parse(fileContent)
+                const exampleRaw = JSON.parse(fileContent)
+
+                // Allow readable inputs: domainLanguageLines/visualLanguageLines arrays or external files
+                let domainLanguage: string = ''
+                let visualLanguage: string = ''
+
+                if (Array.isArray(exampleRaw.domainLanguageLines)) {
+                    domainLanguage = exampleRaw.domainLanguageLines.join('\n')
+                } else if (typeof exampleRaw.domainLanguage === 'string') {
+                    domainLanguage = exampleRaw.domainLanguage
+                } else if (typeof exampleRaw.domainLanguageFile === 'string') {
+                    const dlPath = path.join(examplesDir, exampleRaw.domainLanguageFile)
+                    if (fs.existsSync(dlPath)) {
+                        domainLanguage = fs.readFileSync(dlPath, 'utf8')
+                    }
+                }
+
+                if (Array.isArray(exampleRaw.visualLanguageLines)) {
+                    visualLanguage = exampleRaw.visualLanguageLines.join('\n')
+                } else if (typeof exampleRaw.visualLanguage === 'string') {
+                    visualLanguage = exampleRaw.visualLanguage
+                } else if (typeof exampleRaw.visualLanguageFile === 'string') {
+                    const vlPath = path.join(examplesDir, exampleRaw.visualLanguageFile)
+                    if (fs.existsSync(vlPath)) {
+                        visualLanguage = fs.readFileSync(vlPath, 'utf8')
+                    }
+                }
+
+                const example = {
+                    id: exampleRaw.id,
+                    name: exampleRaw.name,
+                    description: exampleRaw.description,
+                    domainLanguage,
+                    visualLanguage,
+                }
 
                 // Validate example structure
                 if (example &&

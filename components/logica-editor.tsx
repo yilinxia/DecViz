@@ -132,7 +132,7 @@ const LogicaEditor: React.FC<LogicaEditorProps> = ({
                         paddingLeft: `calc(${gutterCh}ch + 8px)`
                     }}
                     aria-hidden="true"
-                    dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+                    dangerouslySetInnerHTML={{ __html: `${highlightedHtml}<span style=\"visibility:hidden\">.</span>` }}
                 />
             )}
 

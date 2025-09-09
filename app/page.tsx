@@ -58,6 +58,7 @@ export default function DecVizApp() {
   const [nodeError, setNodeError] = useState<string>("")
   const [edgeError, setEdgeError] = useState<string>("")
   const [lockedViewportHeight, setLockedViewportHeight] = useState<number | null>(null)
+  const [dotCopied, setDotCopied] = useState(false)
   const { toast } = useToast()
 
   // Detect user's operating system for comment shortcut (client-side only)
@@ -430,13 +431,16 @@ export default function DecVizApp() {
           if (hasColumn(nCols, 'color')) {
             const v = getValue(r, nCols, 'color')
             if (v) {
+              // Keep color attributes per-node only; do not add to common map via allowedCommonKeys
               attrMap.fillcolor = `"${v}"`
-              attrMap.style = '"filled"'
+              attrMap.style = attrMap.style || '"filled"'
             }
           }
 
-          // Track common attributes
+          // Track common attributes (only allow shape, style, fontsize)
+          const allowedCommonKeys = new Set(['shape', 'style', 'fontsize'])
           Object.entries(attrMap).forEach(([key, value]) => {
+            if (!allowedCommonKeys.has(key)) return
             if (!commonNodeAttrs.has(key)) {
               commonNodeAttrs.set(key, value)
             } else if (commonNodeAttrs.get(key) !== value) {
@@ -459,11 +463,13 @@ export default function DecVizApp() {
           nodeSpecificAttrs.set(nodeId, nodeAttrs)
         })
 
-        // Output common node attributes
+        // Output common node attributes (shape, style, fontsize only)
         if (commonNodeAttrs.size > 0) {
           dot += '\n  node [\n'
           Array.from(commonNodeAttrs.entries()).forEach(([key, value]) => {
-            dot += `    ${key}=${value}\n`
+            if (key === 'shape' || key === 'style' || key === 'fontsize') {
+              dot += `    ${key}=${value}\n`
+            }
           })
           dot += '  ];\n'
         }
@@ -520,10 +526,9 @@ export default function DecVizApp() {
           if (hasColumn(nCols, 'color')) {
             const v = getValue(r, nCols, 'color')
             if (v) {
-              if (!commonNodeAttrs.has('fillcolor') || commonNodeAttrs.get('fillcolor') !== `"${v}"`) {
-                attrs.push(`fillcolor="${v}"`)
-              }
-              if (!commonNodeAttrs.has('style') || commonNodeAttrs.get('style') !== '"filled"') {
+              // Never treat fillcolor/style as common; always keep per-node
+              attrs.push(`fillcolor="${v}"`)
+              if (!attrs.some(a => a.startsWith('style='))) {
                 attrs.push(`style="filled"`)
               }
             }
@@ -1140,12 +1145,14 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                                 Download
                               </Button>
                               <Button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(graphvizOutput)
-                                  toast({
-                                    title: "Copied!",
-                                    description: "DOT file content copied to clipboard.",
-                                  })
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(graphvizOutput)
+                                    setDotCopied(true)
+                                    setTimeout(() => setDotCopied(false), 2000)
+                                  } catch (e) {
+                                    // Optional: you could set an error state or silently fail
+                                  }
                                 }}
                                 variant="outline"
                                 size="sm"
@@ -1155,7 +1162,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                                 </svg>
-                                Copy
+                                {dotCopied ? 'Copied' : 'Copy'}
                               </Button>
                             </div>
                           </div>

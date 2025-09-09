@@ -2,6 +2,27 @@
     "id": "basic-graph",
     "name": "Basic AF",
     "description": "A simple argumentation framework showing arguments and attacks",
-    "domainLanguage": "# Basic argumentation framework example\n# Arguments\nArgument(\"a\");\nArgument(\"b\");\nArgument(\"c\");\nArgument(\"d\");\n# Attacks between arguments\nAttacks(\"a\", \"b\");\nAttacks(\"b\", \"c\");\nAttacks(\"c\", \"d\");\nAttacks(\"d\", \"a\");",
-    "visualLanguage": "# Graph properties\nGraph( id: \"af\", rankdir: \"TB\", layout: \"dot\");\n\n# Node definitions - map domain arguments to visual nodes\nNode( node_id: x, label: x, shape: \"circle\", border: \"solid\", fontsize: \"14\") :- Argument(x);\n\n# Edge definitions - map domain attacks to visual edges\nEdge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Attacks(source, target);"
+    "domainLanguageLines": [
+        "# Basic argumentation framework example",
+        "# Arguments",
+        "Argument(\"a\");",
+        "Argument(\"b\");",
+        "Argument(\"c\");",
+        "Argument(\"d\");",
+        "# Attacks between arguments",
+        "Attacks(\"a\", \"b\");",
+        "Attacks(\"b\", \"c\");",
+        "Attacks(\"c\", \"d\");",
+        "Attacks(\"d\", \"a\");"
+    ],
+    "visualLanguageLines": [
+        "# Graph properties",
+        "Graph( id: \"af\", rankdir: \"TB\", layout: \"dot\");",
+        "",
+        "# Node definitions - map domain arguments to visual nodes",
+        "Node( node_id: x, label: x, shape: \"circle\", border: \"solid\", fontsize: \"14\") :- Argument(x);",
+        "",
+        "# Edge definitions - map domain attacks to visual edges",
+        "Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Attacks(source, target);"
+    ]
 }

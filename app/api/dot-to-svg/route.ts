@@ -17,7 +17,37 @@ export async function POST(request: NextRequest) {
 
         // Use @hpcc-js/wasm for pure JavaScript/WASM graphviz rendering
         const graphviz = await Graphviz.load()
-        const svg = graphviz.dot(dot)
+
+        // Detect layout attribute to select engine (dot, neato, fdp, sfdp, twopi, circo)
+        // Example: layout=neato;
+        let engine: any = undefined
+        const layoutMatch = dot.match(/\blayout\s*=\s*(\w+)\s*;/)
+        if (layoutMatch) {
+            const layout = layoutMatch[1].toLowerCase()
+            switch (layout) {
+                case 'dot':
+                    engine = graphviz.layout.dot
+                    break
+                case 'neato':
+                    engine = graphviz.layout.neato
+                    break
+                case 'fdp':
+                    engine = graphviz.layout.fdp
+                    break
+                case 'sfdp':
+                    engine = graphviz.layout.sfdp
+                    break
+                case 'twopi':
+                    engine = graphviz.layout.twopi
+                    break
+                case 'circo':
+                    engine = graphviz.layout.circo
+                    break
+            }
+        }
+
+        // Render SVG; if engine is available, use it, otherwise default
+        const svg = engine ? graphviz.layout(dot, 'svg', engine) : graphviz.dot(dot)
 
         console.log('✅ API: SVG generated successfully, length:', svg.length)
         console.log('📄 API: SVG preview:', svg.substring(0, 200) + '...')

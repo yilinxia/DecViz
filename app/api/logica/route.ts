@@ -805,7 +805,11 @@ function compileToGraphviz(results: any): string {
             const rankdir = getValueByColumn(graphRow, columns, 'rankdir')
             if (rankdir) dot += `  rankdir=${rankdir};\n`
         }
-        // Note: layout attribute is not standard DOT syntax, skipping it
+        // Emit layout attribute so downstream renderer can detect preferred engine
+        if (hasColumn(columns, 'layout')) {
+            const layout = getValueByColumn(graphRow, columns, 'layout')
+            if (layout) dot += `  layout=${layout};\n`
+        }
         // Note: id attribute is not standard DOT syntax, skipping it
     } else {
         // Default values only if no graph table exists
@@ -815,37 +819,81 @@ function compileToGraphviz(results: any): string {
     // Add nodes from Node table
     if (results.nodes && results.nodes.rows && results.nodes.rows.length > 0) {
         const columns = results.nodes.columns
+
+        // Compute common attributes across all nodes for aggregation
+        const aggregatableKeys = ['shape', 'style', 'fontsize']
+        const commonValues: Record<string, string> = {}
+        for (const key of aggregatableKeys) {
+            if (!hasColumn(columns, key)) continue
+            const firstValue = getValueByColumn(results.nodes.rows[0], columns, key)
+            if (!firstValue) continue
+            let allSame = true
+            for (let i = 1; i < results.nodes.rows.length; i++) {
+                const value = getValueByColumn(results.nodes.rows[i], columns, key)
+                if (value !== firstValue) {
+                    allSame = false
+                    break
+                }
+            }
+            if (allSame) commonValues[key] = firstValue
+        }
+
+        // Emit aggregated node defaults (exclude color/fillcolor by design)
+        const aggregatedAttrs: string[] = []
+        if (commonValues['shape']) aggregatedAttrs.push(`shape="${commonValues['shape']}"`)
+        if (commonValues['style']) aggregatedAttrs.push(`style="${commonValues['style']}"`)
+        if (commonValues['fontsize']) aggregatedAttrs.push(`fontsize=${commonValues['fontsize']}`)
+        if (aggregatedAttrs.length > 0) {
+            dot += '\n  node [\n'
+            for (let i = 0; i < aggregatedAttrs.length; i++) {
+                const isLast = i === aggregatedAttrs.length - 1
+                dot += `    ${aggregatedAttrs[i]}\n`
+            }
+            dot += '  ];\n\n'
+        }
+
+        // Emit individual nodes, skipping attributes that are aggregated
         results.nodes.rows.forEach((nodeRow: any[]) => {
             const nodeId = getValueByColumn(nodeRow, columns, 'node_id') || 'unknown'
 
-            // Build node attributes dynamically based on available columns
             const attrs = []
 
             if (hasColumn(columns, 'label')) {
                 const label = getValueByColumn(nodeRow, columns, 'label')
-                if (label) attrs.push(`label="${label}"`)
+                if (label) attrs.push(`label=\"${label}\"`)
             }
-            if (hasColumn(columns, 'shape')) {
+            if (hasColumn(columns, 'shape') && !commonValues['shape']) {
                 const shape = getValueByColumn(nodeRow, columns, 'shape')
-                if (shape) attrs.push(`shape="${shape}"`)
+                if (shape) attrs.push(`shape=\"${shape}\"`)
             }
-            if (hasColumn(columns, 'border')) {
+            // Support explicit style column separate from border
+            if (hasColumn(columns, 'style') && !commonValues['style']) {
+                const style = getValueByColumn(nodeRow, columns, 'style')
+                if (style) attrs.push(`style=\"${style}\"`)
+            }
+            // Back-compat: map border -> style only if no explicit style provided
+            if (!hasColumn(columns, 'style') && hasColumn(columns, 'border') && !commonValues['style']) {
                 const border = getValueByColumn(nodeRow, columns, 'border')
-                if (border) attrs.push(`style="${border}"`)
+                if (border) attrs.push(`style=\"${border}\"`)
             }
-            if (hasColumn(columns, 'fontsize')) {
+            if (hasColumn(columns, 'fontsize') && !commonValues['fontsize']) {
                 const fontsize = getValueByColumn(nodeRow, columns, 'fontsize')
-                if (fontsize) attrs.push(`fontsize="${fontsize}"`)
+                if (fontsize) attrs.push(`fontsize=\"${fontsize}\"`)
             }
+            // Color attributes should never be aggregated; keep them per-node
             if (hasColumn(columns, 'color')) {
                 const color = getValueByColumn(nodeRow, columns, 'color')
-                if (color) attrs.push(`fillcolor="${color}"`)
+                if (color) attrs.push(`color=\"${color}\"`)
+            }
+            if (hasColumn(columns, 'fillcolor')) {
+                const fill = getValueByColumn(nodeRow, columns, 'fillcolor')
+                if (fill) attrs.push(`fillcolor=\"${fill}\"`)
             }
 
             if (attrs.length > 0) {
-                dot += `  "${nodeId}" [${attrs.join(', ')}];\n`
+                dot += `  \"${nodeId}\" [${attrs.join(', ')}];\n`
             } else {
-                dot += `  "${nodeId}";\n`
+                dot += `  \"${nodeId}\";\n`
             }
         })
         dot += '\n'

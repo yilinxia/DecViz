@@ -2,6 +2,25 @@
     "id": "family-tree",
     "name": "Family Tree",
     "description": "Family relationships showing parent-child connections",
-    "domainLanguage": "# Family relationships\nParent(\"Tom\", \"Bob\");\nParent(\"Tom\", \"Liz\");\nParent(\"Bob\", \"Ann\");\nParent(\"Bob\", \"Pat\");\nParent(\"Pat\", \"Jim\");\n\n# Define all people explicitly\nPerson(a):- Parent(a,b) | Parent(b,a);",
-    "visualLanguage": "# Graph properties\nGraph( id: \"family\", rankdir: \"TB\", layout: \"dot\");\n\n# Node definitions - map domain people to visual nodes\nNode( node_id: x, label: x, shape: \"circle\", border: \"solid\", fontsize: \"14\") :- Person(x);\n\n# Edge definitions - map domain parent relationships to visual edges\nEdge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Parent(source, target);"
+    "domainLanguageLines": [
+        "# Family relationships",
+        "Parent(\"Tom\", \"Bob\");",
+        "Parent(\"Tom\", \"Liz\");",
+        "Parent(\"Bob\", \"Ann\");",
+        "Parent(\"Bob\", \"Pat\");",
+        "Parent(\"Pat\", \"Jim\");",
+        "",
+        "# Define all people explicitly",
+        "Person(a):- Parent(a,b) | Parent(b,a);"
+    ],
+    "visualLanguageLines": [
+        "# Graph properties",
+        "Graph( id: \"family\", rankdir: \"TB\", layout: \"dot\");",
+        "",
+        "# Node definitions - map domain people to visual nodes",
+        "Node( node_id: x, label: x, shape: \"circle\", border: \"solid\", fontsize: \"14\") :- Person(x);",
+        "",
+        "# Edge definitions - map domain parent relationships to visual edges",
+        "Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Parent(source, target);"
+    ]
 }
