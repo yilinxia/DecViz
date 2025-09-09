@@ -19,7 +19,8 @@ export async function POST(request: NextRequest) {
         console.log('📝 API: DOT input:', dot.substring(0, 100) + '...')
 
         // Use graphviz-cli to generate SVG (pure JavaScript solution)
-        const { stdout, stderr } = await execAsync(`echo '${dot.replace(/'/g, "'\\''")}' | npx graphviz-cli -Tsvg`)
+        // Fix: Use the locally installed graphviz binary instead of npx to avoid directory creation issues
+        const { stdout, stderr } = await execAsync(`echo '${dot.replace(/'/g, "'\\''")}' | ./node_modules/.bin/graphviz -Tsvg`)
 
         if (stderr) {
             console.error('❌ API: dot command stderr:', stderr)
