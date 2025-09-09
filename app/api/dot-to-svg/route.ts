@@ -18,12 +18,12 @@ export async function POST(request: NextRequest) {
         // Use @hpcc-js/wasm for pure JavaScript/WASM graphviz rendering
         const graphviz = await Graphviz.load()
 
-        // Detect layout attribute to select engine (dot, neato, fdp, sfdp, twopi, circo)
-        // Example: layout=neato;
+        // Detect layout/engine attribute to select engine (dot, neato, fdp, sfdp, twopi, circo)
+        // Examples: layout=neato; or engine=neato;
         let engine: any = undefined
-        const layoutMatch = dot.match(/\blayout\s*=\s*(\w+)\s*;/)
+        const layoutMatch = dot.match(/\b(layout|engine)\s*=\s*(\w+)\s*;/)
         if (layoutMatch) {
-            const layout = layoutMatch[1].toLowerCase()
+            const layout = layoutMatch[2].toLowerCase()
             switch (layout) {
                 case 'dot':
                     engine = graphviz.layout.dot

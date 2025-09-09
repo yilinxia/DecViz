@@ -1,6 +1,6 @@
 {
-    "id": "wild-animals",
-    "name": "Wild Animals",
+    "id": "wild-animals-fd-value",
+    "name": "Wild Animals FDV",
     "description": "Argumentation framework of wild animals (attacks network)",
     "domainLanguageLines": [
         "# Wild Animals",
@@ -37,15 +37,14 @@
         "Attacks(\"U\",\"T\");",
         "Attacks(\"V\",\"U\");",
         "",
-        "Argument(x):- Attacks(x,y) | Attacks(y,x);",
-        "AcceptedArg(x):- Argument(x), ~ Attacks(y,x);"
+        "Argument(x):- Attacks(x,y) | Attacks(y,x);"
     ],
     "visualLanguageLines": [
         "# Graph properties",
-        "Graph( id: \"af\", rankdir: \"BT\", layout: \"neato\");",
+        "Graph( id: \"af\", rankdir: \"BT\", engine: \"fdp\");",
         "",
         "# Node definitions - map domain arguments to visual nodes",
-        "Node( node_id: x, label: x, shape: \"circle\", style: \"filled\", color:\"lightblue\", fontsize: \"14\") :- AcceptedArg(x);",
+        "Node( node_id: x, label: x, shape: \"circle\", style: \"filled\", color:\"lightgray\", fontsize: \"14\") :- Argument(x);",
         "",
         "# Edge definitions - map domain attacks to visual edges",
         "Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Attacks(source, target);"

@@ -388,6 +388,14 @@ export default function DecVizApp() {
           const rankdir = getValue(gRow, gCols, 'rankdir')
           if (rankdir) dot += `  rankdir=${rankdir};\n`
         }
+        // Prefer explicit layout, else map engine -> layout for renderer selection
+        if (hasColumn(gCols, 'layout')) {
+          const layout = getValue(gRow, gCols, 'layout')
+          if (layout) dot += `  layout=${layout};\n`
+        } else if (hasColumn(gCols, 'engine')) {
+          const engine = getValue(gRow, gCols, 'engine')
+          if (engine) dot += `  layout=${engine};\n`
+        }
       } else {
         dot += '  rankdir=TB;\n'
       }

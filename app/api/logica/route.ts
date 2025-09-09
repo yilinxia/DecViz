@@ -119,8 +119,8 @@ class LogicaProgram {
 
             // Generate UNION ALL query for all facts
             const columns = this.getColumnNames(predicateName)
-            const unions = facts.map((fact, index) => {
-                const values = fact.map((arg, i) => {
+            const unions = facts.map((fact: any[], index: number) => {
+                const values = fact.map((arg: any, i: number) => {
                     const colName = columns[i] || `col${i}`
                     return `'${arg}' AS ${colName}`
                 }).join(', ')
@@ -809,6 +809,10 @@ function compileToGraphviz(results: any): string {
         if (hasColumn(columns, 'layout')) {
             const layout = getValueByColumn(graphRow, columns, 'layout')
             if (layout) dot += `  layout=${layout};\n`
+        } else if (hasColumn(columns, 'engine')) {
+            // Back-compat: allow Graph(engine: "neato") to map to DOT layout
+            const engine = getValueByColumn(graphRow, columns, 'engine')
+            if (engine) dot += `  layout=${engine};\n`
         }
         // Note: id attribute is not standard DOT syntax, skipping it
     } else {
