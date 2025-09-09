@@ -156,6 +156,12 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Custom text selection color - light green */
+  ::selection {
+    background-color: #6BB56B;
+    color: #ffffff;
+  }
 }
 
 /* Graphviz rendering styles (inspired by edotor.net) */

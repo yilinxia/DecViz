@@ -333,7 +333,7 @@ export default function LogicaEditor() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col">
       {/* Enhanced Header */}
       <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-sm">
         <div className="mx-auto w-[80%] px-6 py-4">
@@ -404,8 +404,8 @@ export default function LogicaEditor() {
       </header>
 
       {/* Main Content */}
-      <div className="mx-auto w-[80%] px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+      <div className="mx-auto w-[80%] px-6 py-6 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
           {/* Left Panel - Code Editors */}
           <div className="lg:col-span-5 flex flex-col space-y-6 h-full">
             {/* Domain Language Section */}
