@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarSeparator } from "@/components/ui/sidebar"
 import { HistoryEntry } from "@/types/history"
-import { Pencil } from "lucide-react"
+import { Pencil, RotateCcw, Trash2 } from "lucide-react"
 
 interface HistoryPanelProps {
     entries: HistoryEntry[]
@@ -15,9 +15,11 @@ interface HistoryPanelProps {
     onClear: () => void
     onCompare: () => void
     onEditAnnotation: (id: string, value: string) => void
+    onLoad: (id: string) => void
+    onDelete: (id: string) => void
 }
 
-const HistoryPanel: React.FC<HistoryPanelProps> = ({ entries, selectedIds, onToggleSelect, onClear, onCompare, onEditAnnotation }) => {
+const HistoryPanel: React.FC<HistoryPanelProps> = ({ entries, selectedIds, onToggleSelect, onClear, onCompare, onEditAnnotation, onLoad, onDelete }) => {
     const canCompare = selectedIds.length === 2
 
     const sorted = useMemo(() => {
@@ -61,8 +63,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ entries, selectedIds, onTog
                                 const isChecked = selectedIds.includes(entry.id)
                                 const date = new Date(entry.timestamp)
                                 return (
-                                    <li key={entry.id} className="bg-white border border-slate-200 rounded-md p-2">
-                                        <div className="flex items-start gap-2">
+                                    <li key={entry.id} className="bg-white border border-slate-200 rounded-lg p-2 hover:border-slate-300 transition-colors">
+                                        <div className="flex items-center gap-2">
                                             <Checkbox checked={isChecked} onCheckedChange={() => onToggleSelect(entry.id)} />
                                             <div className="flex-1 min-w-0">
                                                 {editingId === entry.id ? (
@@ -84,33 +86,56 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ entries, selectedIds, onTog
                                                     />
                                                 ) : (
                                                     <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            className="text-[12px] font-semibold text-slate-900 truncate"
-                                                            title={entry.annotation?.trim() || "Add a title"}
-                                                            onClick={() => startEdit(entry)}
-                                                        >
-                                                            {entry.annotation?.trim() || "Add a title"}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="opacity-60 hover:opacity-100 transition-opacity"
-                                                            aria-label="Edit title"
-                                                            onClick={() => startEdit(entry)}
-                                                        >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <button
+                                                                type="button"
+                                                                className="text-[12px] font-semibold text-slate-900 truncate"
+                                                                title={entry.annotation?.trim() || "Add a title"}
+                                                                onClick={() => startEdit(entry)}
+                                                            >
+                                                                {entry.annotation?.trim() || "Add a title"}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="opacity-60 hover:opacity-100 transition-opacity"
+                                                                aria-label="Edit title"
+                                                                onClick={() => startEdit(entry)}
+                                                            >
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 )}
-                                                <div className="mt-1 flex items-center justify-between">
+                                                <div className="mt-1 flex items-center justify-start">
                                                     <span className="text-[11px] font-medium text-slate-700">{date.toLocaleString()}</span>
-                                                    <span className="text-[10px] text-slate-500 truncate max-w-[160px]">{entry.domainLanguage.split("\n")[0] || "(domain)"}</span>
+                                                </div>
+                                                <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600">
+                                                    <div className="truncate" title={entry.domainLanguage}>
+                                                        <span className="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50">Domain: {entry.domainLanguage.length} ch</span>
+                                                    </div>
+                                                    <div className="truncate" title={entry.visualLanguage}>
+                                                        <span className="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50">Visual: {entry.visualLanguage.length} ch</span>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => onLoad(entry.id)}
+                                                        className="h-7 px-2 border border-transparent hover:border-slate-300 hover:bg-transparent text-slate-700 hover:text-slate-900"
+                                                    >
+                                                        <RotateCcw className="w-3.5 h-3.5 mr-1" /> Load
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => onDelete(entry.id)}
+                                                        className="h-7 px-2 border border-transparent hover:border-slate-300 hover:bg-transparent text-red-600 hover:text-red-700"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                                                    </Button>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-600">
-                                            <div className="truncate" title={entry.domainLanguage}>Domain: {entry.domainLanguage.length} ch</div>
-                                            <div className="truncate" title={entry.visualLanguage}>Visual: {entry.visualLanguage.length} ch</div>
                                         </div>
                                     </li>
                                 )

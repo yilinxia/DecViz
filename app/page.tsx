@@ -859,6 +859,31 @@ export default function DecVizApp() {
     if (selectedHistoryIds.length === 2) setShowCompareModal(true)
   }
 
+  // Load a history run back into the workspace
+  const handleLoadRun = (id: string) => {
+    const entry = history.find((e) => e.id === id)
+    if (!entry) return
+    setDomainLanguage(entry.domainLanguage)
+    setVisualLanguage(entry.visualLanguage)
+    setGraphvizOutput(entry.dot)
+    setHasGeneratedGraph(true)
+    // Clear current errors/status when restoring
+    setGraphStatus("")
+    setNodeStatus("")
+    setEdgeStatus("")
+    setGraphError("")
+    setNodeError("")
+    setEdgeError("")
+    // Ensure sidebar opens to show action feedback
+    try { setSidebarOpen(true) } catch { }
+  }
+
+  // Delete a history run
+  const handleDeleteRun = (id: string) => {
+    setHistory((prev) => prev.filter((e) => e.id !== id))
+    setSelectedHistoryIds((prev) => prev.filter((x) => x !== id))
+  }
+
   // Hover edge toggle for sidebar
   const EdgeSidebarToggle = () => {
     const { state, toggleSidebar } = useSidebar()
@@ -995,6 +1020,8 @@ export default function DecVizApp() {
           onEditAnnotation={(id, value) => {
             setHistory((prev) => prev.map((e) => e.id === id ? { ...e, annotation: value } : e))
           }}
+          onLoad={handleLoadRun}
+          onDelete={handleDeleteRun}
         />
       </Sidebar>
       <SidebarInset>
