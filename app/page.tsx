@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import LogicaEditor from "@/components/logica-editor"
 import { Label } from "@/components/ui/label"
@@ -12,6 +13,10 @@ import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { type Example } from "@/lib/examples"
 import Footer from "@/components/footer"
+import HistoryPanel from "@/components/history-panel"
+import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { ChevronLeft, ChevronRight, Share2 } from "lucide-react"
+import type { HistoryEntry } from "@/types/history"
 
 const GitHubIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -59,7 +64,15 @@ export default function DecVizApp() {
   const [edgeError, setEdgeError] = useState<string>("")
   const [lockedViewportHeight, setLockedViewportHeight] = useState<number | null>(null)
   const [dotCopied, setDotCopied] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const { toast } = useToast()
+  // Sidebar open state (to auto-open on shared links)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // History state
+  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([])
+  const [showCompareModal, setShowCompareModal] = useState(false)
 
   // Detect user's operating system for comment shortcut (client-side only)
   const [commentShortcut, setCommentShortcut] = useState('Ctrl+/') // Default fallback
@@ -145,6 +158,60 @@ export default function DecVizApp() {
       }
     }
   }, [])
+
+  // Load/save history from localStorage and import from share links
+  useEffect(() => {
+    ; (async () => {
+      try {
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('decviz_history') : null
+        let loadedFromLink = false
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search)
+          const s = params.get('s')
+          const h = params.get('h')
+          if (s) {
+            loadedFromLink = true
+            try {
+              const resp = await fetch(`/api/share?id=${encodeURIComponent(s)}`)
+              const data = await resp.json()
+              if (data?.entries && Array.isArray(data.entries)) {
+                setHistory(data.entries)
+              }
+            } catch { }
+            const cleanUrl = window.location.origin + window.location.pathname
+            window.history.replaceState({}, '', cleanUrl)
+          } else if (h) {
+            loadedFromLink = true
+            try {
+              const decoded = JSON.parse(atob(decodeURIComponent(h)))
+              if (decoded?.entries && Array.isArray(decoded.entries)) {
+                setHistory(decoded.entries)
+              }
+              const cleanUrl = window.location.origin + window.location.pathname
+              window.history.replaceState({}, '', cleanUrl)
+            } catch { }
+          }
+        }
+        if (!loadedFromLink && saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed)) setHistory(parsed)
+        }
+        if (loadedFromLink) {
+          try {
+            setSidebarOpen(true)
+          } catch { }
+        }
+      } catch { }
+    })()
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('decviz_history', JSON.stringify(history))
+      }
+    } catch { }
+  }, [history])
 
   // Load examples on component mount
   useEffect(() => {
@@ -694,6 +761,9 @@ export default function DecVizApp() {
       setGraphvizOutput(dot)
       setLogicaResults(results)
       setHasGeneratedGraph(true)
+
+      // Return for history recording
+      return { dot, results }
     } catch (error: any) {
       console.error('❌ Error running Logica via worker:', error)
       throw new Error(`Logica execution failed: ${error.message}`)
@@ -713,7 +783,18 @@ export default function DecVizApp() {
       await new Promise(resolve => setTimeout(resolve, 500))
 
       console.log("⚙️ Calling generateGraphviz function...")
-      await generateGraphviz(domainLanguage, visualLanguage)
+      const result = await generateGraphviz(domainLanguage, visualLanguage)
+      // Record history on success
+      if (result && result.dot) {
+        const entry: HistoryEntry = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          timestamp: Date.now(),
+          domainLanguage,
+          visualLanguage,
+          dot: result.dot,
+        }
+        setHistory((prev) => [...prev, entry])
+      }
       // Success toast removed per request
       console.log("🎉 Graph generation completed")
     } catch (error: any) {
@@ -757,8 +838,95 @@ export default function DecVizApp() {
     }
   }
 
+  // History selection handlers
+  const toggleSelectHistory = (id: string) => {
+    setSelectedHistoryIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id)
+      }
+      if (prev.length < 2) return [...prev, id]
+      // Replace the first selected when already two selected
+      return [prev[1], id]
+    })
+  }
+
+  const clearHistory = () => {
+    setHistory([])
+    setSelectedHistoryIds([])
+  }
+
+  const openCompare = () => {
+    if (selectedHistoryIds.length === 2) setShowCompareModal(true)
+  }
+
+  // Hover edge toggle for sidebar
+  const EdgeSidebarToggle = () => {
+    const { state, toggleSidebar } = useSidebar()
+    const isOpen = state === 'expanded'
+    return (
+      <div className="fixed left-0 top-0 h-screen w-4 z-50 group">
+        <button
+          onClick={toggleSidebar}
+          aria-label={isOpen ? 'Hide history panel' : 'Show history panel'}
+          className="absolute top-1/2 -translate-y-1/2 left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-slate-300 shadow-sm rounded-full p-1 hover:bg-slate-50"
+        >
+          {isOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+      </div>
+    )
+  }
+
   const handleGitHub = () => {
     window.open('https://github.com/yilinxia/DecViz', '_blank', 'noopener,noreferrer')
+  }
+
+  const handleShareHistory = async () => {
+    try {
+      if (!history || history.length === 0) {
+        toast({ title: "Nothing to share", description: "Your history is empty." })
+        return
+      }
+
+      const payload = {
+        app: "DecViz",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries: history,
+      }
+      const json = JSON.stringify(payload)
+      const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : ''
+      let shareLink = ''
+
+      // Try to create a short id via KV first; if it fails, fall back to ?h= link
+      try {
+        const res = await fetch('/api/share', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: json,
+        })
+        if (res.ok) {
+          const { id } = await res.json()
+          if (id) shareLink = `${baseUrl}?s=${encodeURIComponent(id)}`
+        }
+      } catch { }
+      if (!shareLink) {
+        const encoded = encodeURIComponent(btoa(json))
+        shareLink = `${baseUrl}?h=${encoded}`
+      }
+
+      // Just copy to clipboard; no system share or dialogs
+      try {
+        await navigator.clipboard.writeText(shareLink)
+      } catch {
+        // If copy fails, place link in address bar as a fallback
+        try { window.history.replaceState({}, '', shareLink) } catch { }
+      }
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+      return
+    } catch (e) {
+      toast({ variant: "destructive", title: "Share failed", description: "Could not share history. Please try again." })
+    }
   }
 
   const handleDownload = async () => {
@@ -816,403 +984,586 @@ export default function DecVizApp() {
   }
 
   return (
-    <div
-      className="overflow-y-auto bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col"
-      style={{ height: lockedViewportHeight ? `${lockedViewportHeight}px` : '100dvh' }}
-    >
-      {/* Enhanced Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-sm flex-shrink-0">
-        <div className="mx-auto w-[80%] px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo and Title */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  aria-label="Refresh"
-                  onClick={() => window.location.reload()}
-                  className="relative rounded-xl hover:cursor-pointer focus:outline-none focus:ring-0"
-                >
-                  <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg">
-                    <Image
-                      src="/logo.png"
-                      alt="DecViz Logo"
-                      width={40}
-                      height={40}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </button>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                    DecViz
-                  </h1>
-                  <p className="text-xs text-slate-500 font-medium">Purpose-Driven Graph Visualization via Declarative Transformation</p>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={handleGitHub}
-                className="gap-2 h-12 px-4 rounded-xl border-slate-200 hover:border-green-300 hover:bg-green-50 hover:text-green-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
-              >
-                <GitHubIcon />
-                GitHub
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="mx-auto w-[80%] px-6 py-6 flex-1 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full overflow-hidden">
-          {/* Left Panel - Code Editors */}
-          <div className="lg:col-span-5 flex flex-col space-y-6 h-full min-h-0">
-            {/* Domain Language Section */}
-            <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-              <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#66B2EE' }}></div>
-                      <Label className="text-sm font-semibold text-slate-800">Domain Language</Label>
+    <SidebarProvider defaultOpen={false} open={sidebarOpen} onOpenChange={setSidebarOpen}>
+      <Sidebar side="left" collapsible="offcanvas" className="border-r border-slate-200 bg-white">
+        <HistoryPanel
+          entries={history}
+          selectedIds={selectedHistoryIds}
+          onToggleSelect={toggleSelectHistory}
+          onClear={clearHistory}
+          onCompare={openCompare}
+          onEditAnnotation={(id, value) => {
+            setHistory((prev) => prev.map((e) => e.id === id ? { ...e, annotation: value } : e))
+          }}
+        />
+      </Sidebar>
+      <SidebarInset>
+        <EdgeSidebarToggle />
+        <div
+          className="overflow-y-auto bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col"
+          style={{ height: lockedViewportHeight ? `${lockedViewportHeight}px` : '100dvh' }}
+        >
+          {/* Enhanced Header */}
+          <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-sm flex-shrink-0">
+            <div className="mx-auto w-[80%] px-6 py-4">
+              <div className="flex items-center justify-between">
+                {/* Logo and Title */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      aria-label="Refresh"
+                      onClick={() => window.location.reload()}
+                      className="relative rounded-xl hover:cursor-pointer focus:outline-none focus:ring-0"
+                    >
+                      <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg">
+                        <Image
+                          src="/logo.png"
+                          alt="DecViz Logo"
+                          width={40}
+                          height={40}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </button>
+                    <div>
+                      <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                        DecViz
+                      </h1>
+                      <p className="text-xs text-slate-500 font-medium">Purpose-Driven Graph Visualization via Declarative Transformation</p>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1">Define your domain facts and relationships</p>
                   </div>
 
-                  {/* Example Selector */}
-                  <div className="ml-4">
-                    <Select value={selectedExample} onValueChange={handleExampleChange}>
-                      <SelectTrigger size="sm" className="w-auto min-w-0 h-8 px-2 rounded-md border-slate-200 bg-white transition-all duration-200 shadow-sm hover:bg-blue-100 hover:border-blue-300">
-                        <SelectValue placeholder="Example">
-                          {selectedExample ? examples.find(ex => ex.id === selectedExample)?.name : "Example"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="rounded-lg border-slate-200 shadow-xl">
-                        {examples.map((example) => (
-                          <SelectItem
-                            key={example.id}
-                            value={example.id}
-                            className="rounded-md py-2 transition-all duration-200 hover:bg-green-100"
-                          >
-                            <span className="font-medium text-sm">{example.name}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleShareHistory}
+                    className="gap-2 h-12 px-4 rounded-xl border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    {shareCopied ? 'Copied' : 'Share'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleGitHub}
+                    className="gap-2 h-12 px-4 rounded-xl border-slate-200 hover:border-green-300 hover:bg-green-50 hover:text-green-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
+                  >
+                    <GitHubIcon />
+                    GitHub
+                  </Button>
                 </div>
               </div>
-              <div className="flex-1 p-6 overflow-hidden">
-                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
-                  <LogicaEditor
-                    value={domainLanguage}
-                    onChange={setDomainLanguage}
-                    onKeyDown={(e) => handleCommentToggle(e, domainLanguage, setDomainLanguage)}
-                    placeholder={`# Define your domain facts here
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <div className="mx-auto w-[80%] px-6 py-6 flex-1 overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full overflow-hidden">
+              {/* Left Panel - Code Editors */}
+              <div className="lg:col-span-5 flex flex-col space-y-6 h-full min-h-0">
+                {/* Domain Language Section */}
+                <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+                  <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#66B2EE' }}></div>
+                          <Label className="text-sm font-semibold text-slate-800">Domain Language</Label>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-1">Define your domain facts and relationships</p>
+                      </div>
+
+                      {/* Example Selector */}
+                      <div className="ml-4">
+                        <Select value={selectedExample} onValueChange={handleExampleChange}>
+                          <SelectTrigger size="sm" className="w-auto min-w-0 h-8 px-2 rounded-md border-slate-200 bg-white transition-all duration-200 shadow-sm hover:bg-blue-100 hover:border-blue-300">
+                            <SelectValue placeholder="Example">
+                              {selectedExample ? examples.find(ex => ex.id === selectedExample)?.name : "Example"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg border-slate-200 shadow-xl">
+                            {examples.map((example) => (
+                              <SelectItem
+                                key={example.id}
+                                value={example.id}
+                                className="rounded-md py-2 transition-all duration-200 hover:bg-green-100"
+                              >
+                                <span className="font-medium text-sm">{example.name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 p-6 overflow-hidden">
+                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                      <LogicaEditor
+                        value={domainLanguage}
+                        onChange={setDomainLanguage}
+                        onKeyDown={(e) => handleCommentToggle(e, domainLanguage, setDomainLanguage)}
+                        placeholder={`# Define your domain facts here
 # Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
 Argument("a");
 Argument("b");
 Attacks("a", "b");
 # This is a comment`}
-                    className="w-full h-full rounded-xl"
-                    style={{
-                      minHeight: '200px',
-                      maxHeight: '100%'
-                    }}
-                    spellCheck={false}
-                  />
+                        className="w-full h-full rounded-xl"
+                        style={{
+                          minHeight: '200px',
+                          maxHeight: '100%'
+                        }}
+                        spellCheck={false}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Visual Language Section */}
-            <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-              <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-purple-50 border-b border-slate-200 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6BB56B' }}></div>
-                  <Label className="text-sm font-semibold text-slate-800">Visual Language</Label>
-                </div>
-                <p className="text-xs text-slate-600 mt-1">Configure visualization settings</p>
-              </div>
-              <div className="flex-1 p-6 overflow-hidden">
-                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
-                  <LogicaEditor
-                    value={visualLanguage}
-                    onChange={setVisualLanguage}
-                    onKeyDown={(e) => handleCommentToggle(e, visualLanguage, setVisualLanguage)}
-                    placeholder={`# Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
+                {/* Visual Language Section */}
+                <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+                  <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-purple-50 border-b border-slate-200 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6BB56B' }}></div>
+                      <Label className="text-sm font-semibold text-slate-800">Visual Language</Label>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1">Configure visualization settings</p>
+                  </div>
+                  <div className="flex-1 p-6 overflow-hidden">
+                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                      <LogicaEditor
+                        value={visualLanguage}
+                        onChange={setVisualLanguage}
+                        onKeyDown={(e) => handleCommentToggle(e, visualLanguage, setVisualLanguage)}
+                        placeholder={`# Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
 Node( node_id: x, label: \"x\", shape: \"circle\", border: \"solid\", fontsize: \"14\") :- Argument(x);
 Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", arrowhead: \"normal\", arrowtail: \"\") :- Attacks(source, target);
 # Configuration comments`}
-                    className="w-full h-full rounded-xl"
-                    style={{
-                      minHeight: '200px',
-                      maxHeight: '100%'
-                    }}
-                    spellCheck={false}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel - Graph Visualization */}
-          <div className="lg:col-span-7 h-full min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-            <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-indigo-50 border-b border-slate-200 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isGenerating ? 'animate-pulse' : ''}`} style={{ backgroundColor: isGenerating ? '#EDD266' : '#EDD266' }}></div>
-                  <Label className="text-sm font-semibold text-slate-800">Graph Visualization</Label>
-                  {!workerReady && (
-                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                      Initializing...
-                    </span>
-                  )}
-                  {isGenerating && (
-                    <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
-                      Generating...
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleRunQuery}
-                    disabled={isGenerating || !workerReady}
-                    size="sm"
-                    className="gap-2 h-8 px-3 rounded-lg text-white font-medium shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      background: 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #5BA3E8 0%, #5FA85F 50%, #E6C85C 100%)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)'
-                    }}
-                  >
-                    {isGenerating ? (
-                      <>
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <PlayIcon />
-                        Generate Graph
-                      </>
-                    )}
-                  </Button>
-
-                  <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 h-8 px-3 rounded-lg border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
-                      >
-                        View Results
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-                      <DialogHeader>
-                        <DialogTitle>Raw Logica Results</DialogTitle>
-                      </DialogHeader>
-                      <div className="mt-4 h-[60vh] overflow-auto space-y-4">
-                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
-                          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${graphStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                              <span className="text-sm font-semibold text-slate-800">Graph</span>
-                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${graphStatus === 'OK'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
-                                }`}>
-                                {graphStatus}
-                              </span>
-                            </div>
-                          </div>
-                          {graphError && (
-                            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
-                              <div className="text-sm text-red-800 font-medium">Error:</div>
-                              <div className="text-sm text-red-600 mt-1">{graphError}</div>
-                            </div>
-                          )}
-                          <div className="p-0">
-                            {rawGraphResult ? (
-                              <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
-                                <pre className="p-4 whitespace-pre text-slate-700">{rawGraphResult}</pre>
-                              </div>
-                            ) : (
-                              <div className="p-4 text-center text-slate-500 italic">No data</div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
-                          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-green-50 rounded-t-lg">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${nodeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                              <span className="text-sm font-semibold text-slate-800">Node</span>
-                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${nodeStatus === 'OK'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
-                                }`}>
-                                {nodeStatus}
-                              </span>
-                            </div>
-                          </div>
-                          {nodeError && (
-                            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
-                              <div className="text-sm text-red-800 font-medium">Error:</div>
-                              <div className="text-sm text-red-600 mt-1">{nodeError}</div>
-                            </div>
-                          )}
-                          <div className="p-0">
-                            {rawNodeResult ? (
-                              <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
-                                <pre className="p-4 whitespace-pre text-slate-700">{rawNodeResult}</pre>
-                              </div>
-                            ) : (
-                              <div className="p-4 text-center text-slate-500 italic">No data</div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
-                          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-purple-50 rounded-t-lg">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${edgeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                              <span className="text-sm font-semibold text-slate-800">Edge</span>
-                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${edgeStatus === 'OK'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
-                                }`}>
-                                {edgeStatus}
-                              </span>
-                            </div>
-                          </div>
-                          {edgeError && (
-                            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
-                              <div className="text-sm text-red-800 font-medium">Error:</div>
-                              <div className="text-sm text-red-600 mt-1">{edgeError}</div>
-                            </div>
-                          )}
-                          <div className="p-0">
-                            {rawEdgeResult ? (
-                              <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
-                                <pre className="p-4 whitespace-pre text-slate-700">{rawEdgeResult}</pre>
-                              </div>
-                            ) : (
-                              <div className="p-4 text-center text-slate-500 italic">No data</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog open={showDotModal} onOpenChange={setShowDotModal}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 h-8 px-3 rounded-lg border-slate-200 hover:border-green-300 hover:bg-green-50 hover:text-green-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          <polyline points="14,2 14,8 20,8" />
-                          <line x1="16" y1="13" x2="8" y2="13" />
-                          <line x1="16" y1="17" x2="8" y2="17" />
-                          <polyline points="10,9 9,9 8,9" />
-                        </svg>
-                        View DOT
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-                      <DialogHeader>
-                        <DialogTitle>Generated DOT File</DialogTitle>
-                      </DialogHeader>
-                      <div className="mt-4 h-[60vh] overflow-auto">
-                        <div className="bg-slate-50 rounded-lg border">
-                          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-100 rounded-t-lg">
-                            <span className="text-sm font-medium text-slate-700">DOT Source Code</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                onClick={handleDownloadDot}
-                                variant="outline"
-                                size="sm"
-                                className="gap-2 h-7 px-3 hover:border-green-300 hover:bg-green-50 hover:text-green-700"
-                              >
-                                <DownloadIcon />
-                                Download
-                              </Button>
-                              <Button
-                                onClick={async () => {
-                                  try {
-                                    await navigator.clipboard.writeText(graphvizOutput)
-                                    setDotCopied(true)
-                                    setTimeout(() => setDotCopied(false), 2000)
-                                  } catch (e) {
-                                    // Optional: you could set an error state or silently fail
-                                  }
-                                }}
-                                variant="outline"
-                                size="sm"
-                                className="gap-2 h-7 px-3 hover:border-green-300 hover:bg-green-50 hover:text-green-700"
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                </svg>
-                                {dotCopied ? 'Copied' : 'Copy'}
-                              </Button>
-                            </div>
-                          </div>
-                          <pre className="p-4 text-sm font-mono whitespace-pre-wrap overflow-auto max-h-[50vh]">
-                            {graphvizOutput}
-                          </pre>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-              <p className="text-xs text-slate-600 mt-1">
-                {isGenerating ? 'Generating graph...' : 'Interactive graph with zoom and pan controls'}
-              </p>
-            </div>
-            <div className="flex-1 p-6 overflow-auto">
-              <div className="h-full rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/30 shadow-inner overflow-hidden">
-                <div className="graphviz-container h-full flex items-center justify-center">
-                  {hasGeneratedGraph ? (
-                    <DotCommandRenderer dot={graphvizOutput} className="h-full max-w-full relative" />
-                  ) : (
-                    <div className="text-center p-8">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600">
-                          <polygon points="13,2 3,14 12,14 11,22 21,10 12,10" />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-semibold text-slate-800 mb-2">Ready to Visualize</h3>
-                      <p className="text-sm text-slate-600 mb-4">
-                        Enter your domain language and visual language, then click "Generate Graph" to create your visualization.
-                      </p>
+                        className="w-full h-full rounded-xl"
+                        style={{
+                          minHeight: '200px',
+                          maxHeight: '100%'
+                        }}
+                        spellCheck={false}
+                      />
                     </div>
-                  )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Panel - Graph Visualization */}
+              <div className="lg:col-span-7 h-full min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+                <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-indigo-50 border-b border-slate-200 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${isGenerating ? 'animate-pulse' : ''}`} style={{ backgroundColor: isGenerating ? '#EDD266' : '#EDD266' }}></div>
+                      <Label className="text-sm font-semibold text-slate-800">Graph Visualization</Label>
+                      {!workerReady && (
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                          Initializing...
+                        </span>
+                      )}
+                      {isGenerating && (
+                        <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+                          Generating...
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleRunQuery}
+                        disabled={isGenerating || !workerReady}
+                        size="sm"
+                        className="gap-2 h-8 px-3 rounded-lg text-white font-medium shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          background: 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #5BA3E8 0%, #5FA85F 50%, #E6C85C 100%)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #66B2EE 0%, #6BB56B 50%, #EDD266 100%)'
+                        }}
+                      >
+                        {isGenerating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <PlayIcon />
+                            Generate Graph
+                          </>
+                        )}
+                      </Button>
+
+                      <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 h-8 px-3 rounded-lg border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
+                          >
+                            View Results
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                          <DialogHeader>
+                            <DialogTitle>Raw Logica Results</DialogTitle>
+                          </DialogHeader>
+                          <div className="mt-4 h-[60vh] overflow-auto space-y-4">
+                            <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+                              <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${graphStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                  <span className="text-sm font-semibold text-slate-800">Graph</span>
+                                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${graphStatus === 'OK'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-red-100 text-red-700'
+                                    }`}>
+                                    {graphStatus}
+                                  </span>
+                                </div>
+                              </div>
+                              {graphError && (
+                                <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                                  <div className="text-sm text-red-800 font-medium">Error:</div>
+                                  <div className="text-sm text-red-600 mt-1">{graphError}</div>
+                                </div>
+                              )}
+                              <div className="p-0">
+                                {rawGraphResult ? (
+                                  <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
+                                    <pre className="p-4 whitespace-pre text-slate-700">{rawGraphResult}</pre>
+                                  </div>
+                                ) : (
+                                  <div className="p-4 text-center text-slate-500 italic">No data</div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+                              <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-green-50 rounded-t-lg">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${nodeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                  <span className="text-sm font-semibold text-slate-800">Node</span>
+                                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${nodeStatus === 'OK'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-red-100 text-red-700'
+                                    }`}>
+                                    {nodeStatus}
+                                  </span>
+                                </div>
+                              </div>
+                              {nodeError && (
+                                <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                                  <div className="text-sm text-red-800 font-medium">Error:</div>
+                                  <div className="text-sm text-red-600 mt-1">{nodeError}</div>
+                                </div>
+                              )}
+                              <div className="p-0">
+                                {rawNodeResult ? (
+                                  <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
+                                    <pre className="p-4 whitespace-pre text-slate-700">{rawNodeResult}</pre>
+                                  </div>
+                                ) : (
+                                  <div className="p-4 text-center text-slate-500 italic">No data</div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+                              <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-purple-50 rounded-t-lg">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${edgeStatus === 'OK' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                  <span className="text-sm font-semibold text-slate-800">Edge</span>
+                                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${edgeStatus === 'OK'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-red-100 text-red-700'
+                                    }`}>
+                                    {edgeStatus}
+                                  </span>
+                                </div>
+                              </div>
+                              {edgeError && (
+                                <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                                  <div className="text-sm text-red-800 font-medium">Error:</div>
+                                  <div className="text-sm text-red-600 mt-1">{edgeError}</div>
+                                </div>
+                              )}
+                              <div className="p-0">
+                                {rawEdgeResult ? (
+                                  <div className="font-mono text-xs leading-relaxed bg-slate-50 overflow-x-auto">
+                                    <pre className="p-4 whitespace-pre text-slate-700">{rawEdgeResult}</pre>
+                                  </div>
+                                ) : (
+                                  <div className="p-4 text-center text-slate-500 italic">No data</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Dialog open={showDotModal} onOpenChange={setShowDotModal}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 h-8 px-3 rounded-lg border-slate-200 hover:border-green-300 hover:bg-green-50 hover:text-green-700 bg-white shadow-sm hover:shadow-sm transition-all duration-300 ease-in-out"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14,2 14,8 20,8" />
+                              <line x1="16" y1="13" x2="8" y2="13" />
+                              <line x1="16" y1="17" x2="8" y2="17" />
+                              <polyline points="10,9 9,9 8,9" />
+                            </svg>
+                            View DOT
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                          <DialogHeader>
+                            <DialogTitle>Generated DOT File</DialogTitle>
+                          </DialogHeader>
+                          <div className="mt-4 h-[60vh] overflow-auto">
+                            <div className="bg-slate-50 rounded-lg border">
+                              <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-100 rounded-t-lg">
+                                <span className="text-sm font-medium text-slate-700">DOT Source Code</span>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    onClick={handleDownloadDot}
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2 h-7 px-3 hover:border-green-300 hover:bg-green-50 hover:text-green-700"
+                                  >
+                                    <DownloadIcon />
+                                    Download
+                                  </Button>
+                                  <Button
+                                    onClick={async () => {
+                                      try {
+                                        await navigator.clipboard.writeText(graphvizOutput)
+                                        setDotCopied(true)
+                                        setTimeout(() => setDotCopied(false), 2000)
+                                      } catch (e) {
+                                        // Optional: you could set an error state or silently fail
+                                      }
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2 h-7 px-3 hover:border-green-300 hover:bg-green-50 hover:text-green-700"
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                    </svg>
+                                    {dotCopied ? 'Copied' : 'Copy'}
+                                  </Button>
+                                </div>
+                              </div>
+                              <pre className="p-4 text-sm font-mono whitespace-pre-wrap overflow-auto max-h-[50vh]">
+                                {graphvizOutput}
+                              </pre>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      {/* Compare Dialog */}
+                      <Dialog open={showCompareModal} onOpenChange={setShowCompareModal}>
+                        <DialogContent className="w-[99vw] max-w-[98vw] h-[90vh] overflow-auto">
+                          <DialogHeader>
+                            <DialogTitle>Compare Runs</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const selectedEntries = selectedHistoryIds
+                              .map((id) => history.find((e) => e.id === id))
+                              .filter(Boolean) as HistoryEntry[]
+                            if (selectedEntries.length !== 2) return (
+                              <div className="p-4 text-sm text-slate-600">Select two records from the left panel to compare.</div>
+                            )
+                            let [a, b] = selectedEntries as [HistoryEntry, HistoryEntry]
+                            // Ensure latest (newer timestamp) is on the right
+                            if (a.timestamp > b.timestamp) {
+                              const t = a; a = b; b = t
+                            }
+                            const renderSideBySide = (left: string, right: string) => {
+                              const leftLines = (left || '').split('\n')
+                              const rightLines = (right || '').split('\n')
+                              const maxLen = Math.max(leftLines.length, rightLines.length)
+                              const rows = [] as JSX.Element[]
+                              for (let i = 0; i < maxLen; i++) {
+                                const l = leftLines[i] ?? ''
+                                const r = rightLines[i] ?? ''
+                                const changed = l !== r
+                                rows.push(
+                                  <div key={i} className="grid grid-cols-2 gap-2">
+                                    <pre className={`text-xs whitespace-pre-wrap p-2 rounded border ${changed ? 'bg-yellow-50 border-yellow-200' : 'bg-slate-50 border-slate-200'}`}>{l}</pre>
+                                    <pre className={`text-xs whitespace-pre-wrap p-2 rounded border ${changed ? 'bg-yellow-50 border-yellow-200' : 'bg-slate-50 border-slate-200'}`}>{r}</pre>
+                                  </div>
+                                )
+                              }
+                              return <div className="space-y-1">{rows}</div>
+                            }
+                            const renderWholeWithDiff = (left: string, right: string) => {
+                              const aLines = (left || '').split('\n')
+                              const bLines = (right || '').split('\n')
+                              const n = aLines.length
+                              const m = bLines.length
+                              const dp: number[][] = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0))
+                              for (let i = n - 1; i >= 0; i--) {
+                                for (let j = m - 1; j >= 0; j--) {
+                                  if (aLines[i] === bLines[j]) dp[i][j] = 1 + dp[i + 1][j + 1]
+                                  else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1])
+                                }
+                              }
+                              const commonA = new Set<number>()
+                              const commonB = new Set<number>()
+                              let i = 0, j = 0
+                              while (i < n && j < m) {
+                                if (aLines[i] === bLines[j]) {
+                                  commonA.add(i); commonB.add(j); i++; j++
+                                } else if (dp[i + 1][j] >= dp[i][j + 1]) i++
+                                else j++
+                              }
+                              const renderBlock = (lines: string[], commons: Set<number>, addedColor: string) => (
+                                <pre className="text-xs whitespace-pre-wrap p-2 rounded border bg-slate-50 border-slate-200 h-full overflow-auto">
+                                  {lines.map((line, idx) => (
+                                    <div key={idx} className={`${commons.has(idx) ? '' : addedColor} px-1 -mx-1 rounded`}>{line || ' '}</div>
+                                  ))}
+                                </pre>
+                              )
+                              return (
+                                <div className="grid grid-cols-2 gap-2 h-[34vh]">
+                                  {renderBlock(aLines, commonA, 'bg-red-50')}
+                                  {renderBlock(bLines, commonB, 'bg-green-50')}
+                                </div>
+                              )
+                            }
+                            const getTitle = (e: HistoryEntry) => (e.annotation?.trim() || (e.domainLanguage.split('\n')[0] || 'Untitled'))
+                            const annA = (a.annotation || '').trim()
+                            const annB = (b.annotation || '').trim()
+                            return (
+                              <div className="mt-2">
+                                <div className="grid grid-cols-2 gap-4">
+                                  {/* Left column: Domain + Visual */}
+                                  <div className="space-y-4">
+                                    {/* Domain Language Comparison */}
+                                    <div className="rounded-lg border border-slate-200 bg-white">
+                                      <div className="px-3 py-2 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg text-sm font-semibold text-slate-800">
+                                        Domain Language
+                                      </div>
+                                      <div className="p-3">
+                                        <div className="grid grid-cols-2 gap-2 mb-2">
+                                          <div className="text-[11px] font-medium text-slate-700 truncate" title={annA || undefined}>
+                                            <span className="uppercase">Run A</span>
+                                            {annA && <span>: {annA}</span>}
+                                          </div>
+                                          <div className="text-[11px] font-medium text-slate-700 truncate" title={annB || undefined}>
+                                            <span className="uppercase">Run B</span>
+                                            {annB && <span>: {annB}</span>}
+                                          </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 h-[34vh]">
+                                          <pre className="text-xs whitespace-pre-wrap p-2 rounded border bg-slate-50 border-slate-200 h-full overflow-auto">{a.domainLanguage}</pre>
+                                          <pre className="text-xs whitespace-pre-wrap p-2 rounded border bg-slate-50 border-slate-200 h-full overflow-auto">{b.domainLanguage}</pre>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Visual Language Comparison */}
+                                    <div className="rounded-lg border border-slate-200 bg-white">
+                                      <div className="px-3 py-2 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-purple-50 rounded-t-lg text-sm font-semibold text-slate-800">
+                                        Visual Language
+                                      </div>
+                                      <div className="p-3">
+                                        <div className="grid grid-cols-2 gap-2 mb-2">
+                                          <div className="text-[11px] font-medium text-slate-700 truncate" title={annA || undefined}>
+                                            <span className="uppercase">Run A</span>
+                                            {annA && <span>: {annA}</span>}
+                                          </div>
+                                          <div className="text-[11px] font-medium text-slate-700 truncate" title={annB || undefined}>
+                                            <span className="uppercase">Run B</span>
+                                            {annB && <span>: {annB}</span>}
+                                          </div>
+                                        </div>
+                                        {renderWholeWithDiff(a.visualLanguage, b.visualLanguage)}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right column: Graphs */}
+                                  <div>
+                                    <div className="rounded-lg border border-slate-200 bg-white">
+                                      <div className="px-3 py-2 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-indigo-50 rounded-t-lg text-sm font-semibold text-slate-800">
+                                        Graph Visualization
+                                      </div>
+                                      <div className="p-2">
+                                        <div className="grid grid-cols-2 gap-2 mb-2 px-1">
+                                          <div className="text-[11px] font-medium text-slate-700 truncate" title={annA || undefined}>
+                                            <span className="uppercase">Run A</span>
+                                            {annA && <span>: {annA}</span>}
+                                          </div>
+                                          <div className="text-[11px] font-medium text-slate-700 truncate" title={annB || undefined}>
+                                            <span className="uppercase">Run B</span>
+                                            {annB && <span>: {annB}</span>}
+                                          </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 h-[78vh]">
+                                          <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                            <DotCommandRenderer dot={a.dot} className="h-full" />
+                                          </div>
+                                          <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                            <DotCommandRenderer dot={b.dot} className="h-full" />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1">
+                    {isGenerating ? 'Generating graph...' : 'Interactive graph with zoom and pan controls'}
+                  </p>
+                </div>
+                <div className="flex-1 p-6 overflow-auto">
+                  <div className="h-full rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/30 shadow-inner overflow-hidden">
+                    <div className="graphviz-container h-full flex items-center justify-center">
+                      {hasGeneratedGraph ? (
+                        <DotCommandRenderer dot={graphvizOutput} className="h-full max-w-full relative" />
+                      ) : (
+                        <div className="text-center p-8">
+                          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600">
+                              <polygon points="13,2 3,14 12,14 11,22 21,10 12,10" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-semibold text-slate-800 mb-2">Ready to Visualize</h3>
+                          <p className="text-sm text-slate-600 mb-4">
+                            Enter your domain language and visual language, then click "Generate Graph" to create your visualization.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <Footer />
-    </div>
+          <Footer />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
