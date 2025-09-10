@@ -786,6 +786,17 @@ export default function DecVizApp() {
       const result = await generateGraphviz(domainLanguage, visualLanguage)
       // Record history on success
       if (result && result.dot) {
+        // Determine if we should auto-open the history sidebar (first successful run only)
+        let shouldAutoOpen = false
+        try {
+          if (typeof window !== 'undefined') {
+            const alreadyShown = localStorage.getItem('decviz_sidebar_autoopen_done')
+            if (!alreadyShown && history.length === 0) {
+              shouldAutoOpen = true
+            }
+          }
+        } catch { }
+
         const entry: HistoryEntry = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           timestamp: Date.now(),
@@ -794,6 +805,14 @@ export default function DecVizApp() {
           dot: result.dot,
         }
         setHistory((prev) => [...prev, entry])
+
+        // Auto-open the sidebar once to introduce the panel
+        if (shouldAutoOpen) {
+          try {
+            setSidebarOpen(true)
+            localStorage.setItem('decviz_sidebar_autoopen_done', '1')
+          } catch { }
+        }
       }
       // Success toast removed per request
       console.log("🎉 Graph generation completed")
