@@ -12,6 +12,7 @@ import DotCommandRenderer from "@/components/dot-command-renderer"
 import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { type Example } from "@/lib/examples"
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "@/lib/lz-string"
 import Footer from "@/components/footer"
 import HistoryPanel from "@/components/history-panel"
 import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
@@ -183,9 +184,16 @@ export default function DecVizApp() {
           } else if (h) {
             loadedFromLink = true
             try {
-              const decoded = JSON.parse(atob(decodeURIComponent(h)))
-              if (decoded?.entries && Array.isArray(decoded.entries)) {
-                setHistory(decoded.entries)
+              // Try new compressed format first; fall back to legacy base64
+              let decodedObj: any = null
+              try {
+                const decompressed = decompressFromEncodedURIComponent(decodeURIComponent(h))
+                decodedObj = JSON.parse(decompressed)
+              } catch {
+                decodedObj = JSON.parse(atob(decodeURIComponent(h)))
+              }
+              if (decodedObj?.entries && Array.isArray(decodedObj.entries)) {
+                setHistory(decodedObj.entries)
               }
               const cleanUrl = window.location.origin + window.location.pathname
               window.history.replaceState({}, '', cleanUrl)
@@ -954,8 +962,8 @@ export default function DecVizApp() {
         }
       } catch { }
       if (!shareLink) {
-        const encoded = encodeURIComponent(btoa(json))
-        shareLink = `${baseUrl}?h=${encoded}`
+        const compressed = encodeURIComponent(compressToEncodedURIComponent(json))
+        shareLink = `${baseUrl}?h=${compressed}`
       }
 
       // Just copy to clipboard; no system share or dialogs
