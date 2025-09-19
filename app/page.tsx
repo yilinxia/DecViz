@@ -17,7 +17,7 @@ import { executeLogica } from "@/lib/logica-executor"
 import Footer from "@/components/footer"
 import HistoryPanel from "@/components/history-panel"
 import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
-import { ChevronLeft, ChevronRight, Share2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Share2, Scan } from "lucide-react"
 import type { HistoryEntry } from "@/types/history"
 
 const GitHubIcon = () => (
@@ -74,6 +74,9 @@ export default function DecVizApp() {
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([])
   const [showCompareModal, setShowCompareModal] = useState(false)
+  const [showDomainModal, setShowDomainModal] = useState(false)
+  const [showVisualModal, setShowVisualModal] = useState(false)
+  const isEditorModalOpen = showDomainModal || showVisualModal
 
   // Detect user's operating system for comment shortcut (client-side only)
   const [commentShortcut, setCommentShortcut] = useState('Ctrl+/') // Default fallback
@@ -922,7 +925,7 @@ export default function DecVizApp() {
         <button
           onClick={toggleSidebar}
           aria-label={isOpen ? 'Hide history panel' : 'Show history panel'}
-          className="absolute top-1/2 -translate-y-1/2 left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-slate-300 shadow-sm rounded-full p-1 hover:bg-slate-50"
+          className="absolute top-1/2 -translate-y-1/2 left-1 opacity-100 transition-opacity bg-white border border-slate-300 shadow-sm rounded-full p-1 hover:bg-slate-50"
         >
           {isOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
@@ -1106,7 +1109,7 @@ export default function DecVizApp() {
         >
           {/* Enhanced Header */}
           <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-sm flex-shrink-0">
-            <div className="mx-auto w-[80%] px-6 py-4">
+            <div className="mx-auto w-[96%] px-3 pl-8 py-4">
               <div className="flex items-center justify-between">
                 {/* Logo and Title */}
                 <div className="flex items-center gap-4">
@@ -1161,13 +1164,13 @@ export default function DecVizApp() {
           </header>
 
           {/* Main Content */}
-          <div className="mx-auto w-[80%] px-6 py-6 flex-1 overflow-hidden">
+          <div className="mx-auto w-[96%] px-3 pl-8 py-6 flex-1 overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full overflow-hidden">
               {/* Left Panel - Code Editors */}
               <div className="lg:col-span-5 flex flex-col space-y-6 h-full min-h-0">
                 {/* Domain Language Section */}
                 <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-                  <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 flex-shrink-0">
+                  <div className="px-6 py-3 bg-gradient-to-r from-blue-100/40 via-blue-100/30 to-transparent border-b border-slate-200 flex-shrink-0">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2">
@@ -1200,8 +1203,8 @@ export default function DecVizApp() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex-1 p-6 overflow-hidden">
-                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                  <div className="flex-1 p-4 overflow-hidden">
+                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden relative">
                       <LogicaEditor
                         value={domainLanguage}
                         onChange={setDomainLanguage}
@@ -1219,21 +1222,32 @@ Attacks("a", "b");
                         }}
                         spellCheck={false}
                       />
+                      {/* Fullscreen Button */}
+                      {!isEditorModalOpen && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDomainModal(true)}
+                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-blue-100 hover:border-blue-300 rounded-lg shadow-sm z-[60] pointer-events-auto"
+                        >
+                          <Scan className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Visual Language Section */}
                 <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-                  <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-purple-50 border-b border-slate-200 flex-shrink-0">
+                  <div className="px-6 py-3 bg-gradient-to-r from-green-100/40 via-green-100/30 to-transparent border-b border-slate-200 flex-shrink-0">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6BB56B' }}></div>
                       <Label className="text-sm font-semibold text-slate-800">Visual Language</Label>
                     </div>
                     <p className="text-xs text-slate-600 mt-1">Configure visualization settings</p>
                   </div>
-                  <div className="flex-1 p-6 overflow-hidden">
-                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                  <div className="flex-1 p-4 overflow-hidden">
+                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden relative">
                       <LogicaEditor
                         value={visualLanguage}
                         onChange={setVisualLanguage}
@@ -1249,6 +1263,17 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                         }}
                         spellCheck={false}
                       />
+                      {/* Fullscreen Button */}
+                      {!isEditorModalOpen && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowVisualModal(true)}
+                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-green-100 hover:border-green-300 rounded-lg shadow-sm z-[60] pointer-events-auto"
+                        >
+                          <Scan className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1256,7 +1281,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
 
               {/* Right Panel - Graph Visualization */}
               <div className="lg:col-span-7 h-full min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-                <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-indigo-50 border-b border-slate-200 flex-shrink-0">
+                <div className="px-6 py-3 bg-gradient-to-r from-yellow-100/40 via-yellow-100/30 to-transparent border-b border-slate-200 flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${isGenerating ? 'animate-pulse' : ''}`} style={{ backgroundColor: isGenerating ? '#EDD266' : '#EDD266' }}></div>
@@ -1563,7 +1588,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                     {isGenerating ? 'Generating graph...' : 'Interactive graph with zoom and pan controls'}
                   </p>
                 </div>
-                <div className="flex-1 p-6 overflow-auto">
+                <div className="flex-1 p-4 overflow-auto">
                   <div className="h-full rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/30 shadow-inner overflow-hidden">
                     <div className="graphviz-container h-full flex items-center justify-center">
                       {hasGeneratedGraph ? (
@@ -1587,6 +1612,64 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
               </div>
             </div>
           </div>
+
+          {/* Domain Language Fullscreen Modal */}
+          <Dialog open={showDomainModal} onOpenChange={setShowDomainModal}>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>Domain Language Editor</DialogTitle>
+              </DialogHeader>
+              <div className="mt-4 h-[70vh] overflow-hidden">
+                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                  <LogicaEditor
+                    value={domainLanguage}
+                    onChange={setDomainLanguage}
+                    onKeyDown={(e) => handleCommentToggle(e, domainLanguage, setDomainLanguage)}
+                    placeholder={`# Define your domain facts here
+# Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
+Argument("a");
+Argument("b");
+Attacks("a", "b");
+# This is a comment`}
+                    className="w-full h-full rounded-xl"
+                    style={{
+                      minHeight: '400px',
+                      maxHeight: '100%'
+                    }}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Visual Language Fullscreen Modal */}
+          <Dialog open={showVisualModal} onOpenChange={setShowVisualModal}>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>Visual Language Editor</DialogTitle>
+              </DialogHeader>
+              <div className="mt-4 h-[70vh] overflow-hidden">
+                <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden">
+                  <LogicaEditor
+                    value={visualLanguage}
+                    onChange={setVisualLanguage}
+                    onKeyDown={(e) => handleCommentToggle(e, visualLanguage, setVisualLanguage)}
+                    placeholder={`# Tip: Use Cmd+/ (Mac) or Ctrl+/ (Win/Linux) to toggle comments
+Node( node_id: x, label: "x", shape: "circle", border: "solid", fontsize: "14") :- Argument(x);
+Edge(source_id: source, target_id: target, color: "black", style: "solid", arrowhead: "normal", arrowtail: "") :- Attacks(source, target);
+# Configuration comments`}
+                    className="w-full h-full rounded-xl"
+                    style={{
+                      minHeight: '400px',
+                      maxHeight: '100%'
+                    }}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Footer />
         </div>

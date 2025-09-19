@@ -175,6 +175,10 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
     const handleFitToScreen = useCallback(() => {
         if (panZoomRef.current) {
             try {
+                // Ensure pan-zoom recalculates viewport before fitting
+                if (typeof panZoomRef.current.resize === 'function') {
+                    panZoomRef.current.resize()
+                }
                 panZoomRef.current.fit()
                 panZoomRef.current.center()
                 // console.log("🎯 DotCommandRenderer: Fitted to screen using pan-zoom")
@@ -233,6 +237,43 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
 
     return (
         <div className={`relative w-full h-full ${className}`}>
+            {/* Keep pan-zoom sizing synced with container changes (e.g., sidebar toggle, window resize) */}
+            {(() => {
+                // Inline effect to attach observers without extra re-renders
+                // This pattern keeps indentation/locality without adding new hooks above
+                // eslint-disable-next-line react-hooks/rules-of-hooks
+                useEffect(() => {
+                    let resizeObserver: ResizeObserver | null = null
+                    const handleContainerResize = () => {
+                        if (panZoomRef.current && typeof panZoomRef.current.resize === 'function') {
+                            try {
+                                panZoomRef.current.resize()
+                            } catch (err) {
+                                // noop
+                            }
+                        }
+                    }
+                    if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+                        resizeObserver = new ResizeObserver(() => {
+                            // Defer to next frame so CSS transitions can settle
+                            requestAnimationFrame(handleContainerResize)
+                        })
+                        resizeObserver.observe(containerRef.current)
+                    }
+                    const onWindowResize = () => {
+                        requestAnimationFrame(handleContainerResize)
+                    }
+                    window.addEventListener('resize', onWindowResize)
+                    return () => {
+                        window.removeEventListener('resize', onWindowResize)
+                        if (resizeObserver && containerRef.current) {
+                            try { resizeObserver.unobserve(containerRef.current) } catch { }
+                            try { resizeObserver.disconnect() } catch { }
+                        }
+                    }
+                }, [])
+                return null
+            })()}
             {/* Controls */}
             <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-2 items-end">
                 <Button
