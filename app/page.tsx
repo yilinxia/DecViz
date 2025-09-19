@@ -76,7 +76,7 @@ export default function DecVizApp() {
   const [showCompareModal, setShowCompareModal] = useState(false)
   const [showDomainModal, setShowDomainModal] = useState(false)
   const [showVisualModal, setShowVisualModal] = useState(false)
-  const isEditorModalOpen = showDomainModal || showVisualModal
+  const isAnyModalOpen = showDomainModal || showVisualModal || showDotModal || showResultsModal || showCompareModal
 
   // Detect user's operating system for comment shortcut (client-side only)
   const [commentShortcut, setCommentShortcut] = useState('Ctrl+/') // Default fallback
@@ -1110,7 +1110,7 @@ export default function DecVizApp() {
           {/* Enhanced Header */}
           <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-sm flex-shrink-0">
             <div className="mx-auto w-[96%] px-3 pl-8 py-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between w-full">
                 {/* Logo and Title */}
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-3">
@@ -1170,8 +1170,8 @@ export default function DecVizApp() {
               <div className="lg:col-span-5 flex flex-col space-y-6 h-full min-h-0">
                 {/* Domain Language Section */}
                 <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-                  <div className="px-6 py-3 bg-gradient-to-r from-blue-100/40 via-blue-100/30 to-transparent border-b border-slate-200 flex-shrink-0">
-                    <div className="flex items-center justify-between">
+                  <div className="px-6 py-3 bg-gradient-to-r from-blue-100/40 via-blue-100/30 to-transparent border-b border-slate-200 flex-shrink-0 h-20 flex items-center">
+                    <div className="flex items-center justify-between h-full w-full">
                       <div>
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#66B2EE' }}></div>
@@ -1223,7 +1223,7 @@ Attacks("a", "b");
                         spellCheck={false}
                       />
                       {/* Fullscreen Button */}
-                      {!isEditorModalOpen && (
+                      {!isAnyModalOpen && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -1239,12 +1239,14 @@ Attacks("a", "b");
 
                 {/* Visual Language Section */}
                 <div className="h-[calc(50%-12px)] min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-                  <div className="px-6 py-3 bg-gradient-to-r from-green-100/40 via-green-100/30 to-transparent border-b border-slate-200 flex-shrink-0">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6BB56B' }}></div>
-                      <Label className="text-sm font-semibold text-slate-800">Visual Language</Label>
+                  <div className="px-6 py-3 bg-gradient-to-r from-green-100/40 via-green-100/30 to-transparent border-b border-slate-200 flex-shrink-0 h-20 flex items-center">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6BB56B' }}></div>
+                        <Label className="text-sm font-semibold text-slate-800">Visual Language</Label>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1">Configure visualization settings</p>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1">Configure visualization settings</p>
                   </div>
                   <div className="flex-1 p-4 overflow-hidden">
                     <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden relative">
@@ -1264,7 +1266,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                         spellCheck={false}
                       />
                       {/* Fullscreen Button */}
-                      {!isEditorModalOpen && (
+                      {!isAnyModalOpen && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -1281,23 +1283,28 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
 
               {/* Right Panel - Graph Visualization */}
               <div className="lg:col-span-7 h-full min-h-0 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-                <div className="px-6 py-3 bg-gradient-to-r from-yellow-100/40 via-yellow-100/30 to-transparent border-b border-slate-200 flex-shrink-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${isGenerating ? 'animate-pulse' : ''}`} style={{ backgroundColor: isGenerating ? '#EDD266' : '#EDD266' }}></div>
-                      <Label className="text-sm font-semibold text-slate-800">Graph Visualization</Label>
-                      {!pyodideReady && (
-                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                          Initializing...
-                        </span>
-                      )}
-                      {isGenerating && (
-                        <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
-                          Generating...
-                        </span>
-                      )}
+                <div className="px-6 py-3 bg-gradient-to-r from-yellow-100/40 via-yellow-100/30 to-transparent border-b border-slate-200 flex-shrink-0 h-20 flex items-center">
+                  <div className="flex items-center justify-between w-full h-full">
+                    <div className="flex flex-col space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isGenerating ? 'animate-pulse' : ''}`} style={{ backgroundColor: isGenerating ? '#EDD266' : '#EDD266' }}></div>
+                        <Label className="text-sm font-semibold text-slate-800">Graph Visualization</Label>
+                        {!pyodideReady && (
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                            Initializing...
+                          </span>
+                        )}
+                        {isGenerating && (
+                          <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+                            Generating...
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {isGenerating ? 'Generating graph...' : 'Interactive graph with zoom and pan controls'}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 ml-4 h-full">
                       <Button
                         onClick={handleRunQuery}
                         disabled={isGenerating || !pyodideReady}
@@ -1584,9 +1591,6 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                       </Dialog>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-600 mt-1">
-                    {isGenerating ? 'Generating graph...' : 'Interactive graph with zoom and pan controls'}
-                  </p>
                 </div>
                 <div className="flex-1 p-4 overflow-auto">
                   <div className="h-full rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/30 shadow-inner overflow-hidden">
