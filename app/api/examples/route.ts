@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
         const files = fs.readdirSync(examplesDir)
         const jsonFiles = files.filter(file => file.endsWith('.json'))
 
-        console.log('📁 Found example files:', jsonFiles)
+        // console.log('📁 Found example files:', jsonFiles)
 
         const examples = []
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
                     typeof example.domainLanguage === 'string' &&
                     typeof example.visualLanguage === 'string') {
                     examples.push(example)
-                    console.log(`✅ Loaded example: ${example.name}`)
+                    // console.log(`✅ Loaded example: ${example.name}`)
                 } else {
                     console.warn(`⚠️ Invalid example structure in ${filename}`)
                 }
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        console.log(`📊 Total examples loaded: ${examples.length}`)
+        // console.log(`📊 Total examples loaded: ${examples.length}`)
         return NextResponse.json({ examples })
 
     } catch (error) {

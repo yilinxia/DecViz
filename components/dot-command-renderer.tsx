@@ -21,17 +21,17 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
     useEffect(() => {
         const renderGraph = async () => {
             if (!dot.trim()) {
-                console.log("🎨 DotCommandRenderer: No DOT to render")
+                // console.log("🎨 DotCommandRenderer: No DOT to render")
                 return
             }
 
-            console.log("🎨 DotCommandRenderer: Rendering DOT:", dot.substring(0, 100) + "...")
+            // console.log("🎨 DotCommandRenderer: Rendering DOT:", dot.substring(0, 100) + "...")
             setIsLoading(true)
             setError(null)
 
             try {
-                console.log("🔄 DotCommandRenderer: Starting rendering process...")
-                console.log("📝 DotCommandRenderer: DOT input:", dot)
+                // console.log("🔄 DotCommandRenderer: Starting rendering process...")
+                // console.log("📝 DotCommandRenderer: DOT input:", dot)
 
                 // Call our dot command API
                 const response = await fetch('/api/dot-to-svg', {
@@ -50,11 +50,11 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
                 const data = await response.json()
                 const svg = data.svg
 
-                console.log("✅ DotCommandRenderer: SVG generated, length:", svg.length)
-                console.log("📄 DotCommandRenderer: SVG content:", svg.substring(0, 500) + "...")
+                // console.log("✅ DotCommandRenderer: SVG generated, length:", svg.length)
+                // console.log("📄 DotCommandRenderer: SVG content:", svg.substring(0, 500) + "...")
 
                 if (containerRef.current) {
-                    console.log("📦 DotCommandRenderer: Container found, setting innerHTML...")
+                    // console.log("📦 DotCommandRenderer: Container found, setting innerHTML...")
 
                     // Create the same structure as edotor.net
                     const htmlContent = `
@@ -65,16 +65,16 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
             </div>
           `
 
-                    console.log("🏗️ DotCommandRenderer: HTML content:", htmlContent.substring(0, 200) + "...")
+                    // console.log("🏗️ DotCommandRenderer: HTML content:", htmlContent.substring(0, 200) + "...")
 
                     containerRef.current.innerHTML = htmlContent
                     setSvgContent(svg)
 
                     const svgElement = containerRef.current.querySelector("svg")
-                    console.log("🎯 DotCommandRenderer: SVG element found:", svgElement ? "YES" : "NO")
+                    // console.log("🎯 DotCommandRenderer: SVG element found:", svgElement ? "YES" : "NO")
 
                     if (svgElement) {
-                        console.log("📏 DotCommandRenderer: SVG dimensions:", svgElement.getAttribute("width"), "x", svgElement.getAttribute("height"))
+                        // console.log("📏 DotCommandRenderer: SVG dimensions:", svgElement.getAttribute("width"), "x", svgElement.getAttribute("height"))
                         svgRef.current = svgElement
 
                         // Apply the same styling as edotor.net
@@ -85,7 +85,7 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
                         svgElement.style.display = "block"
                         svgElement.style.cursor = "grab"
 
-                        console.log("🎨 DotCommandRenderer: SVG styles applied")
+                        // console.log("🎨 DotCommandRenderer: SVG styles applied")
 
                         // Initialize pan and zoom
                         try {
@@ -111,18 +111,18 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
                                 mouseWheelZoomEnabled: true,
                                 preventMouseEventsDefault: false,
                                 onZoom: (level: number) => {
-                                    console.log("🔍 Zoom level:", level)
+                                    // console.log("🔍 Zoom level:", level)
                                 }
                             })
 
-                            console.log("🎯 DotCommandRenderer: Pan-zoom initialized")
+                            // console.log("🎯 DotCommandRenderer: Pan-zoom initialized")
                         } catch (err) {
                             console.error("❌ DotCommandRenderer: Error initializing pan-zoom:", err)
                         }
 
                         // Add hover effects to nodes
                         const nodes = svgElement.querySelectorAll("g.node")
-                        console.log(`🎯 DotCommandRenderer: Found ${nodes.length} nodes`)
+                        // console.log(`🎯 DotCommandRenderer: Found ${nodes.length} nodes`)
 
                         nodes.forEach((node) => {
                             const title = node.querySelector("title")?.textContent
@@ -139,12 +139,12 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
                             }
                         })
                     } else {
-                        console.log("❌ DotCommandRenderer: No SVG element found in container!")
+                        // console.log("❌ DotCommandRenderer: No SVG element found in container!")
                     }
 
-                    console.log("✅ DotCommandRenderer: Graph rendered successfully!")
+                    // console.log("✅ DotCommandRenderer: Graph rendered successfully!")
                 } else {
-                    console.log("❌ DotCommandRenderer: Container ref is null!")
+                    // console.log("❌ DotCommandRenderer: Container ref is null!")
                 }
             } catch (err) {
                 console.error("❌ DotCommandRenderer: Rendering error:", err)
@@ -163,7 +163,7 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
             if (panZoomRef.current) {
                 try {
                     panZoomRef.current.destroy()
-                    console.log("🧹 DotCommandRenderer: Pan-zoom instance destroyed")
+                    // console.log("🧹 DotCommandRenderer: Pan-zoom instance destroyed")
                 } catch (err) {
                     console.error("❌ DotCommandRenderer: Error destroying pan-zoom:", err)
                 }
@@ -177,7 +177,7 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
             try {
                 panZoomRef.current.fit()
                 panZoomRef.current.center()
-                console.log("🎯 DotCommandRenderer: Fitted to screen using pan-zoom")
+                // console.log("🎯 DotCommandRenderer: Fitted to screen using pan-zoom")
             } catch (err) {
                 console.error("❌ DotCommandRenderer: Error fitting to screen:", err)
             }
@@ -188,7 +188,7 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
         if (panZoomRef.current) {
             try {
                 panZoomRef.current.zoomIn()
-                console.log("🔍 DotCommandRenderer: Zoomed in")
+                // console.log("🔍 DotCommandRenderer: Zoomed in")
             } catch (err) {
                 console.error("❌ DotCommandRenderer: Error zooming in:", err)
             }
@@ -199,7 +199,7 @@ const DotCommandRenderer = memo(({ dot, className = "" }: DotCommandRendererProp
         if (panZoomRef.current) {
             try {
                 panZoomRef.current.zoomOut()
-                console.log("🔍 DotCommandRenderer: Zoomed out")
+                // console.log("🔍 DotCommandRenderer: Zoomed out")
             } catch (err) {
                 console.error("❌ DotCommandRenderer: Error zooming out:", err)
             }

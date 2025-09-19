@@ -202,7 +202,7 @@ function parseLogicaRules(logicaContent: string): LogicaRule[] {
                 rules.push(rule)
             }
         } catch (error) {
-            console.log(`⚠️ Error parsing line: ${line}`, error)
+            // console.log(`⚠️ Error parsing line: ${line}`, error)
         }
     }
 
@@ -347,7 +347,7 @@ function parseArgument(arg: string): any {
 
 // Execute SQLite query (simplified in-memory implementation)
 function executeSqliteQuery(sql: string): any[] {
-    console.log('🔍 Executing SQL:', sql)
+    // console.log('🔍 Executing SQL:', sql)
 
     try {
         // Simple SQL executor for basic SELECT statements
@@ -365,7 +365,7 @@ function executeSqliteQuery(sql: string): any[] {
                         const partResults = executeSelectQuery(trimmedPart)
                         results.push(...partResults)
                     } catch (error) {
-                        console.log(`⚠️ Error parsing UNION part: ${trimmedPart}`, error)
+                        // console.log(`⚠️ Error parsing UNION part: ${trimmedPart}`, error)
                         // Continue with other parts
                     }
                 }
@@ -379,7 +379,7 @@ function executeSqliteQuery(sql: string): any[] {
             return executeSelectQuery(sql)
         }
 
-        console.log('⚠️ Unsupported SQL query type:', sql)
+        // console.log('⚠️ Unsupported SQL query type:', sql)
         return []
 
     } catch (error) {
@@ -390,12 +390,12 @@ function executeSqliteQuery(sql: string): any[] {
 
 // Execute a SELECT query
 function executeSelectQuery(sql: string): any[] {
-    console.log('🔍 Parsing SELECT query:', sql)
+    // console.log('🔍 Parsing SELECT query:', sql)
 
     // Handle simple SELECT without FROM clause (e.g., SELECT 'value' AS col)
     const simpleSelectMatch = sql.match(/SELECT\s+(.+?)(?:\s+FROM\s+(.+?))?(?:\s+WHERE\s+(.+))?$/i)
     if (!simpleSelectMatch) {
-        console.log('⚠️ Could not parse SELECT query:', sql)
+        // console.log('⚠️ Could not parse SELECT query:', sql)
         return []
     }
 
@@ -452,7 +452,7 @@ function executeSelectQuery(sql: string): any[] {
         row[col.alias] = col.value
     }
 
-    console.log('📊 Generated row:', row)
+    // console.log('📊 Generated row:', row)
     return [row]
 }
 
@@ -570,16 +570,16 @@ function evaluateLogicaDirectly(rules: LogicaRule[]): any {
 // JavaScript-based Logica parser (replaces Python execution)
 // Based on Logica Playground implementation
 function parseLogicaWithJavaScript(logicaContent: string): any {
-    console.log('🔍 Parsing Logica content with JavaScript...')
+    // console.log('🔍 Parsing Logica content with JavaScript...')
 
     try {
         // Parse Logica rules similar to the playground's RunPredicate function
         const rules = parseLogicaRules(logicaContent)
-        console.log('📋 Parsed rules:', rules)
+        // console.log('📋 Parsed rules:', rules)
 
         // Use direct evaluation instead of SQL compilation
         const results = evaluateLogicaDirectly(rules)
-        console.log('📊 Direct evaluation results:', results)
+        // console.log('📊 Direct evaluation results:', results)
         return results
 
     } catch (error) {
@@ -591,7 +591,7 @@ function parseLogicaWithJavaScript(logicaContent: string): any {
 
 // Simple fallback parser for basic cases
 function parseLogicaSimple(logicaContent: string): any {
-    console.log('🔄 Using simple Logica parser as fallback...')
+    // console.log('🔄 Using simple Logica parser as fallback...')
 
     const results: any = {
         graph: { columns: [], rows: [] },
@@ -646,7 +646,7 @@ function parseLogicaSimple(logicaContent: string): any {
         }
     }
 
-    console.log('📊 Simple parsing results:', results)
+    // console.log('📊 Simple parsing results:', results)
     return results
 }
 
@@ -965,16 +965,16 @@ export async function POST(request: NextRequest) {
 
 ${cleanVisualLanguage}`
 
-        console.log('📝 Logica content:', logicaContent)
+        // console.log('📝 Logica content:', logicaContent)
 
         // Execute Logica parsing using pure JavaScript (no Python dependency)
-        console.log('🔧 Parsing Logica using JavaScript implementation...')
+        // console.log('🔧 Parsing Logica using JavaScript implementation...')
 
         const results = parseLogicaWithJavaScript(logicaContent)
 
         // Compile results to Graphviz DOT
         const graphvizDot = compileToGraphviz(results)
-        console.log('🎨 Generated Graphviz DOT:', graphvizDot)
+        // console.log('🎨 Generated Graphviz DOT:', graphvizDot)
 
         // Always return the Logica results, even if empty
         return NextResponse.json({

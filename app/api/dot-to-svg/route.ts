@@ -12,8 +12,8 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        console.log('🔄 API: Converting DOT to SVG using @hpcc-js/wasm')
-        console.log('📝 API: DOT input:', dot.substring(0, 100) + '...')
+        // console.log('🔄 API: Converting DOT to SVG using @hpcc-js/wasm')
+        // console.log('📝 API: DOT input:', dot.substring(0, 100) + '...')
 
         // Use @hpcc-js/wasm for pure JavaScript/WASM graphviz rendering
         const graphviz = await Graphviz.load()
@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
         // Render SVG; if engine is available, use it, otherwise default
         const svg = engine ? graphviz.layout(dot, 'svg', engine) : graphviz.dot(dot)
 
-        console.log('✅ API: SVG generated successfully, length:', svg.length)
-        console.log('📄 API: SVG preview:', svg.substring(0, 200) + '...')
+        // console.log('✅ API: SVG generated successfully, length:', svg.length)
+        // console.log('📄 API: SVG preview:', svg.substring(0, 200) + '...')
 
         return NextResponse.json({ svg })
 
