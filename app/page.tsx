@@ -1228,7 +1228,7 @@ Attacks("a", "b");
                           variant="outline"
                           size="sm"
                           onClick={() => setShowDomainModal(true)}
-                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-blue-100 hover:border-blue-300 rounded-lg shadow-sm z-[60] pointer-events-auto"
+                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-blue-100 hover:border-blue-300 rounded-lg shadow-sm z-10 pointer-events-auto"
                         >
                           <Scan className="w-4 h-4" />
                         </Button>
@@ -1271,7 +1271,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                           variant="outline"
                           size="sm"
                           onClick={() => setShowVisualModal(true)}
-                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-green-100 hover:border-green-300 rounded-lg shadow-sm z-[60] pointer-events-auto"
+                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-green-100 hover:border-green-300 rounded-lg shadow-sm z-10 pointer-events-auto"
                         >
                           <Scan className="w-4 h-4" />
                         </Button>
