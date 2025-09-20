@@ -147,7 +147,7 @@ const LogicaEditor: React.FC<LogicaEditorProps> = ({
                 onBlur={handleBlur}
                 placeholder={placeholder}
                 spellCheck={spellCheck}
-                className={`relative bg-transparent ${value ? 'text-transparent' : 'text-slate-500'} resize-none outline-none border-none p-2 m-0 w-full h-full whitespace-pre-wrap overflow-y-auto overflow-x-hidden z-20`}
+                className={`relative bg-transparent ${value ? 'text-transparent selection:text-transparent' : 'text-slate-500'} selection:bg-blue-400/50 resize-none outline-none border-none p-2 m-0 w-full h-full whitespace-pre-wrap overflow-y-auto overflow-x-hidden z-20`}
                 style={{
                     caretColor: isFocused ? '#2563eb' : '#374151',
                     font: 'inherit',
