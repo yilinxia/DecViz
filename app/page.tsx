@@ -1044,43 +1044,57 @@ export default function DecVizApp() {
   const DataFrameTable = ({ title, data, status }: { title: string, data: any, status: string }) => {
     if (status !== 'OK' || !data?.rows?.length) {
       return (
-        <div className="border rounded-lg p-4">
-          <h3 className="font-semibold text-lg mb-2">{title}</h3>
-          <p className="text-muted-foreground">No data available</p>
+        <div className="border rounded-lg p-3">
+          <h3 className="font-semibold text-sm mb-1">{title}</h3>
+          <p className="text-muted-foreground text-xs">No data available</p>
         </div>
       )
     }
 
     return (
-      <div className="border rounded-lg p-4">
-        <h3 className="font-semibold text-lg mb-2">{title}</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-muted">
-                {data.columns.map((col: string, idx: number) => (
-                  <th key={idx} className="border p-2 text-left font-medium">
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((row: string[], rowIdx: number) => (
-                <tr key={rowIdx} className="hover:bg-muted/50">
-                  {row.map((cell: string, colIdx: number) => (
-                    <td key={colIdx} className="border p-2">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-sm text-muted-foreground mt-2">
-          {data.rows.length} row{data.rows.length !== 1 ? 's' : ''}, {data.columns.length} column{data.columns.length !== 1 ? 's' : ''}
-        </p>
+      <div className="border rounded-lg p-3">
+        {(() => {
+          const t = (title || '').toLowerCase()
+          const headerBg = t === 'graph' ? 'bg-blue-50' : t === 'node' ? 'bg-emerald-50' : t === 'edge' ? 'bg-amber-50' : 'bg-muted'
+          const headerText = t === 'graph' ? 'text-blue-700' : t === 'node' ? 'text-emerald-700' : t === 'edge' ? 'text-amber-700' : 'text-slate-700'
+          const accentBg = t === 'graph' ? 'bg-blue-200' : t === 'node' ? 'bg-emerald-200' : t === 'edge' ? 'bg-amber-200' : 'bg-slate-200'
+          return (
+            <>
+              <div className={`h-1 rounded-t-md ${accentBg} mb-2`} />
+              <h3 className={`font-semibold text-sm mb-2 ${headerText}`}>{title}</h3>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full border-collapse table-fixed text-[12px] leading-5">
+                  <thead>
+                    <tr>
+                      {data.columns.map((col: string, idx: number) => (
+                        <th
+                          key={idx}
+                          className={`border px-2 py-1 text-left font-semibold text-[12px] sticky top-0 z-10 ${headerBg} ${headerText}`}
+                        >
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.rows.map((row: string[], rowIdx: number) => (
+                      <tr key={rowIdx} className="odd:bg-white even:bg-slate-50 hover:bg-muted/50">
+                        {row.map((cell: string, colIdx: number) => (
+                          <td key={colIdx} className="border px-2 py-1 align-top">
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {data.rows.length} row{data.rows.length !== 1 ? 's' : ''}, {data.columns.length} column{data.columns.length !== 1 ? 's' : ''}
+              </p>
+            </>
+          )
+        })()}
       </div>
     )
   }
@@ -1228,7 +1242,7 @@ Attacks("a", "b");
                           variant="outline"
                           size="sm"
                           onClick={() => setShowDomainModal(true)}
-                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-blue-100 hover:border-blue-300 rounded-lg shadow-sm z-10 pointer-events-auto"
+                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-blue-100 hover:border-blue-300 rounded-lg shadow-sm z-30 pointer-events-auto"
                         >
                           <Scan className="w-4 h-4" />
                         </Button>
@@ -1271,7 +1285,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                           variant="outline"
                           size="sm"
                           onClick={() => setShowVisualModal(true)}
-                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-green-100 hover:border-green-300 rounded-lg shadow-sm z-10 pointer-events-auto"
+                          className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm hover:bg-green-100 hover:border-green-300 rounded-lg shadow-sm z-30 pointer-events-auto"
                         >
                           <Scan className="w-4 h-4" />
                         </Button>

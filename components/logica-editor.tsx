@@ -37,7 +37,7 @@ const LogicaEditor: React.FC<LogicaEditorProps> = ({
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
 
-        const tokenRegex = /(#[^\n]*$)|((?:\"(?:[^\"\\]|\\.)*\")|(?:'(?:[^'\\]|\\.)*'))|\b([A-Z][\w]*)\s*(?=\()|\b([a-z][\w]*)\b(?=\s*:)\s*:|\b(true|false|if|then|else|and|or|not)\b|(:\-|->|<=|>=|==|!=|<|>|=|\||\&)|\b(\d+\.?\d*)\b|\b([a-z][\w]*)\b/gm
+        const tokenRegex = /(#[^\n]*$)|((?:\"(?:[^\"\\]|\\.)*\")|(?:'(?:[^'\\]|\\.)*'))|\b([A-Z][\w]*)\s*(?=\()|\b([a-z][\w]*)\b(?=\s*: )\s*:|\b(true|false|if|then|else|and|or|not)\b|(:\-|->|<=|>=|==|!=|&lt;|&gt;|<|>|=|\||&(?![a-zA-Z]+;))|\b(\d+\.?\d*)\b|\b([a-z][\w]*)\b/gm
 
         return escaped.replace(tokenRegex, (
             _match,
