@@ -6,7 +6,12 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "docker:build": "docker build -t decviz .",
+    "docker:run": "docker run -p 3000:3000 -p 8000:8000 decviz",
+    "docker:dev": "docker-compose up frontend backend",
+    "docker:prod": "docker-compose up app",
+    "deploy:do": "doctl apps create --spec .do/app.yaml"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -1,21 +1,13 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from mangum import Mangum
 import tempfile
 import os
-import pandas as pd
 import subprocess
 import sys
 import re
-
-# Import logica library
-try:
-    from logica.common import logica_lib
-    LOGICA_AVAILABLE = True
-except ImportError:
-    LOGICA_AVAILABLE = False
 
 app = FastAPI()
 
@@ -47,95 +39,81 @@ def _escape_for_dot(s: str) -> str:
     return s
 
 
-def run_via_cli_and_parse(file_path: str, predicate: str, alt_order: bool = False, use_bin: bool = False) -> tuple[list[str], list[list[str]], str]:
-    """Invoke Logica CLI to run_in_terminal and parse table output.
-    Returns (columns, rows, stderr) or ([], [], err) if it fails.
-    """
+def run_logica_predicate(file_path: str, predicate: str) -> tuple[list[str], list[list[str]], str]:
+    """Run Logica predicate using CLI and parse table output."""
     try:
-        if use_bin:
-            # Use logica binary on PATH
-            cmd = ['logica', file_path, 'run_in_terminal', predicate] if alt_order else ['logica', 'run_in_terminal', file_path, predicate]
-        else:
-            # Use python -m logica
-            cmd = [sys.executable, '-m', 'logica', file_path, 'run_in_terminal', predicate] if alt_order else [sys.executable, '-m', 'logica', 'run_in_terminal', file_path, predicate]
-
+        cmd = [sys.executable, '-m', 'logica', file_path, 'run_in_terminal', predicate]
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
+        
         if proc.returncode != 0:
             return [], [], proc.stderr.strip()
 
-        output = proc.stdout
-        # Parse ASCII table
-        lines = [ln.rstrip() for ln in output.splitlines()]
+        # Parse ASCII table output
+        lines = [line.rstrip() for line in proc.stdout.splitlines()]
+        
+        # Find header line (starts with |, contains |, doesn't start with +)
         header_idx = -1
-        sep_idx = -1
-        for i, ln in enumerate(lines):
-            st = ln.strip()
-            if st.startswith('|') and '|' in st and not st.startswith('+'):
+        for i, line in enumerate(lines):
+            if line.strip().startswith('|') and '|' in line and not line.strip().startswith('+'):
                 header_idx = i
-                for j in range(i + 1, len(lines)):
-                    if lines[j].strip().startswith('+'):
-                        sep_idx = j
-                        break
                 break
-        if header_idx == -1 or sep_idx == -1:
-            return [], [], ''
+        
+        if header_idx == -1:
+            return [], [], 'No table header found'
 
+        # Find separator line after header
+        sep_idx = -1
+        for j in range(header_idx + 1, len(lines)):
+            if lines[j].strip().startswith('+'):
+                sep_idx = j
+                break
+        
+        if sep_idx == -1:
+            return [], [], 'No table separator found'
+
+        # Extract columns from header
         header_line = lines[header_idx].strip()
-        columns = [c.strip() for c in header_line.strip('|').split('|') if c.strip()]
+        columns = [col.strip() for col in header_line.strip('|').split('|') if col.strip()]
 
-        data_rows: list[list[str]] = []
+        # Extract data rows
+        data_rows = []
         for k in range(sep_idx + 1, len(lines)):
             row_line = lines[k].strip()
             if not row_line or row_line.startswith('+') or '|' not in row_line:
                 continue
-            values = [c.strip() for c in row_line.strip('|').split('|')]
-            # Clean enclosing quotes from each value, then escape for DOT
-            values = [_escape_for_dot(_strip_outer_quotes(v)) for v in values]
+            
+            values = [val.strip() for val in row_line.strip('|').split('|')]
+            # Clean quotes and escape for DOT
+            values = [_escape_for_dot(_strip_outer_quotes(val)) for val in values]
             if values:
                 data_rows.append(values)
+        
         return columns, data_rows, ''
     except Exception as e:
         return [], [], str(e)
 
 
-def run_predicates(program: str, predicates: list[str]) -> dict:
-    """Execute predicates with Logica and return tables as {columns, rows}."""
-    # Write program to a stable temp file name temp.l inside a temp dir
+def execute_logica_program(program: str, predicates: list[str]) -> dict:
+    """Execute Logica program and return results for specified predicates."""
     temp_dir = tempfile.mkdtemp(prefix="logica_")
     temp_file = os.path.join(temp_dir, "temp.l")
+    
     try:
+        # Write program to temp file
         with open(temp_file, "w") as f:
             f.write(program)
 
-        results: dict[str, dict] = {}
-        uses_clingo = 'RunClingo(' in program
-        last_err = ''
-
+        results = {}
         for predicate in predicates:
-            # Try CLI in multiple invocation forms
-            cols, rows, err = run_via_cli_and_parse(temp_file, predicate)
-            if not rows:
-                cols, rows, err = run_via_cli_and_parse(temp_file, predicate, alt_order=True)
-            if not rows:
-                cols, rows, err = run_via_cli_and_parse(temp_file, predicate, use_bin=True)
-
-            if (not rows) and not uses_clingo:
-                # Fallback to Python API only for non-ASP programs
-                df: pd.DataFrame = logica_lib.RunPredicateToPandas(temp_file, predicate)
-                cols = list(df.columns)
-                rows = [list(row) for row in df.itertuples(index=False, name=None)]
-
-            if not rows and err:
-                last_err = err
-
-            results[predicate] = {"columns": cols or [], "rows": rows or []}
-
-        if uses_clingo and all(len(v.get('rows', [])) == 0 for v in results.values()):
-            raise RuntimeError(f"Logica CLI failed. {last_err}".strip())
-
+            columns, rows, error = run_logica_predicate(temp_file, predicate)
+            results[predicate] = {"columns": columns, "rows": rows}
+            
+            if error:
+                print(f"Warning: {predicate} failed - {error}")
+        
         return results
-
     finally:
+        # Cleanup temp files
         try:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -169,26 +147,20 @@ def build_program(domain_language: str, visual_language: str | None) -> str:
 
 
 async def execute_logica(payload: ExecutePayload):
-    """Core logic for executing Logica - shared by both routes"""
+    """Execute Logica program and return results."""
     try:
-        # Build a single Logica program, honoring domain @Engine or default sqlite
+        # Build program with engine declaration
         program = build_program(payload.domainLanguage, payload.visualLanguage)
-        # Execute Graph, Node, Edge via Python Logica (supports clingo & duckdb in server env)
-        tables = run_predicates(program, ["Graph", "Node", "Edge"])
-
-        # Expose as separate tables too (graph, node, edge)
-        graph_tbl = tables.get("Graph", {"columns": [], "rows": []})
-        node_tbl = tables.get("Node", {"columns": [], "rows": []})
-        edge_tbl = tables.get("Edge", {"columns": [], "rows": []})
         
-        # print(node_tbl)
+        # Execute predicates
+        tables = execute_logica_program(program, ["Graph", "Node", "Edge"])
 
         return JSONResponse({
             "status": "OK",
             "tables": tables,
-            "graph": graph_tbl,
-            "node": node_tbl,
-            "edge": edge_tbl,
+            "graph": tables.get("Graph", {"columns": [], "rows": []}),
+            "node": tables.get("Node", {"columns": [], "rows": []}),
+            "edge": tables.get("Edge", {"columns": [], "rows": []}),
         })
 
     except Exception as e:
@@ -196,6 +168,11 @@ async def execute_logica(payload: ExecutePayload):
             "status": "error",
             "error": str(e)
         }, status_code=500)
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 
 @app.post("/")
@@ -210,4 +187,4 @@ async def handler_alias(payload: ExecutePayload):
 
 
 # Mangum handler for Vercel (only used in serverless environment)
-handler = Mangum(app)
+mangum_handler = Mangum(app)

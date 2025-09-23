@@ -35,7 +35,68 @@ uvicorn api.logica_backend:app --reload --port 8000
 NEXT_PUBLIC_LOGICA_BACKEND_URL=http://localhost:8000 npm run dev
 ```
 
+> Note: You can use `./start.sh` to start both backend and frontend in development mode.
 
+## Docker Development
+
+For easier development with Docker:
+
+1. **Development with Docker Compose:**
+```bash
+# Start both frontend and backend in development mode
+npm run docker:dev
+```
+
+2. **Production build with Docker:**
+```bash
+# Build and run production container
+npm run docker:build
+npm run docker:run
+```
+
+## DigitalOcean Deployment
+
+### Prerequisites
+- DigitalOcean account
+- `doctl` CLI installed ([Installation Guide](https://docs.digitalocean.com/reference/doctl/how-to/install/))
+
+### Quick Deployment
+
+1. **Authenticate with DigitalOcean:**
+```bash
+doctl auth init
+```
+
+2. **Deploy using the automated script:**
+```bash
+./deploy.sh
+```
+
+### Manual Deployment
+
+1. **Build and test locally:**
+```bash
+docker build -t decviz .
+docker run -p 3000:3000 -p 8000:8000 decviz
+```
+
+2. **Deploy to DigitalOcean App Platform:**
+```bash
+doctl apps create --spec .do/app.yaml
+```
+
+3. **Update deployment:**
+```bash
+doctl apps update <app-id> --spec .do/app.yaml
+```
+
+### Environment Configuration
+
+Copy the example environment files and customize as needed:
+```bash
+cp env.development.example .env.development
+cp env.production.example .env.production
+```
 
 ## How It Works
 

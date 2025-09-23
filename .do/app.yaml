@@ -1,0 +1,30 @@
+name: decviz
+services:
+- name: web
+  source_dir: /
+  github:
+    repo: yilinxia/DecViz
+    branch: main
+  run_command: /app/start.sh
+  environment_slug: docker
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  http_port: 3000
+  routes:
+  - path: /
+  health_check:
+    http_path: /
+    initial_delay_seconds: 10
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3
+  envs:
+  - key: NODE_ENV
+    value: production
+  # Let Next.js proxy to backend inside container; avoid exposing localhost to browser
+  - key: PORT
+    value: "3000"
+  - key: PYTHONPATH
+    value: /app
+
