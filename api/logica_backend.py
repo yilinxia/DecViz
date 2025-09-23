@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from mangum import Mangum
 import tempfile
 import os
 import pandas as pd
@@ -10,7 +11,11 @@ import sys
 import re
 
 # Import logica library
-from logica.common import logica_lib
+try:
+    from logica.common import logica_lib
+    LOGICA_AVAILABLE = True
+except ImportError:
+    LOGICA_AVAILABLE = False
 
 app = FastAPI()
 
@@ -163,8 +168,8 @@ def build_program(domain_language: str, visual_language: str | None) -> str:
     return "\n".join(parts)
 
 
-@app.post("/")
-async def handler(payload: ExecutePayload):
+async def execute_logica(payload: ExecutePayload):
+    """Core logic for executing Logica - shared by both routes"""
     try:
         # Build a single Logica program, honoring domain @Engine or default sqlite
         program = build_program(payload.domainLanguage, payload.visualLanguage)
@@ -176,7 +181,7 @@ async def handler(payload: ExecutePayload):
         node_tbl = tables.get("Node", {"columns": [], "rows": []})
         edge_tbl = tables.get("Edge", {"columns": [], "rows": []})
         
-        print(node_tbl)
+        # print(node_tbl)
 
         return JSONResponse({
             "status": "OK",
@@ -193,9 +198,16 @@ async def handler(payload: ExecutePayload):
         }, status_code=500)
 
 
+@app.post("/")
+async def handler(payload: ExecutePayload):
+    return await execute_logica(payload)
+
+
 # Alias path to match frontend expectation
 @app.post("/api/logica_backend")
 async def handler_alias(payload: ExecutePayload):
-    return await handler(payload)
+    return await execute_logica(payload)
 
 
+# Mangum handler for Vercel (only used in serverless environment)
+handler = Mangum(app)

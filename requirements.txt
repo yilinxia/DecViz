@@ -5,4 +5,4 @@ logica
 clingo
 duckdb
 uvicorn==0.29.0
-
+mangum

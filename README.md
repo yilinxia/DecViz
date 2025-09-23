@@ -24,10 +24,18 @@ conda activate decviz
 npm install
 ```
 
-2. Start development server:
+2. Start backend server (Python FastAPI):
 ```bash
-npm run dev
+pip install -r requirements.txt
+uvicorn api.logica_backend:app --reload --port 8000
 ```
+
+3. Start frontend development server:
+```bash
+NEXT_PUBLIC_LOGICA_BACKEND_URL=http://localhost:8000 npm run dev
+```
+
+
 
 ## How It Works
 
