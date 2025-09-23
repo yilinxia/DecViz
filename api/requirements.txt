@@ -1,0 +1,8 @@
+fastapi==0.110.0
+pydantic==2.6.1
+pandas==2.2.2
+logica
+clingo
+duckdb
+uvicorn==0.29.0
+

@@ -97,3 +97,6 @@ temp/
 # Package manager lock files (keep only one)
 package-lock.json
 yarn.lock
+
+
+__pycache__/
