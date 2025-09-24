@@ -158,7 +158,7 @@ async def execute_logica(payload: ExecutePayload):
     try:
         # Build program with engine declaration
         program = build_program(payload.domainLanguage, payload.visualLanguage)
-        
+        print(program)
         # Execute predicates
         tables = execute_logica_program(program, ["Graph", "Node", "Edge", "Ranking"])
         return JSONResponse({

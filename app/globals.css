@@ -162,6 +162,28 @@
     background-color: #6BB56B;
     color: #ffffff;
   }
+
+  /* Inside Monaco, use Monaco's own selection overlay (no extra green) */
+  .monaco-editor ::selection {
+    background: transparent;
+    color: inherit;
+  }
+}
+
+/* Remove Monaco lane shading and divider */
+.monaco-editor .margin {
+  border-right: none !important;
+}
+
+.monaco-editor .view-overlays .line-decorations {
+  background: transparent !important;
+}
+
+/* Remove blue focus outline on Radix dialog content/close button */
+[role="dialog"][data-slot="dialog-content"],
+[data-slot="dialog-close"] {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Graphviz rendering styles (inspired by edotor.net) */

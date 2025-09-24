@@ -1114,6 +1114,10 @@ function compileToGraphviz(results: any): string {
                 const fontsize = getValueByColumn(nodeRow, columns, 'fontsize')
                 if (fontsize) attrs.push(`fontsize=\"${fontsize}\"`)
             }
+            if (hasColumn(columns, 'fontname')) {
+                const fontname = getValueByColumn(nodeRow, columns, 'fontname')
+                if (fontname) attrs.push(`fontname=\"${fontname}\"`)
+            }
             // Color attributes should never be aggregated; keep them per-node
             if (hasColumn(columns, 'color')) {
                 const color = getValueByColumn(nodeRow, columns, 'color')
@@ -1208,6 +1212,18 @@ function compileToGraphviz(results: any): string {
             if (hasColumn(columns, 'label')) {
                 const label = getValueByColumn(edgeRow, columns, 'label')
                 if (label) attrs.push(`label="${label}"`)
+            }
+            if (hasColumn(columns, 'headlabel')) {
+                const headlabel = getValueByColumn(edgeRow, columns, 'headlabel')
+                if (headlabel) attrs.push(`headlabel="${headlabel}"`)
+            }
+            if (hasColumn(columns, 'fontcolor')) {
+                const fontcolor = getValueByColumn(edgeRow, columns, 'fontcolor')
+                if (fontcolor) attrs.push(`fontcolor="${fontcolor}"`)
+            }
+            if (hasColumn(columns, 'taillabel')) {
+                const taillabel = getValueByColumn(edgeRow, columns, 'taillabel')
+                if (taillabel) attrs.push(`taillabel="${taillabel}"`)
             }
 
             let edgeDef = `  "${sourceId}" -> "${targetId}"`

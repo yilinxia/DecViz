@@ -536,6 +536,10 @@ export default function DecVizApp() {
           const v = getValue(r, nCols, 'fontsize')
           if (v) attrMap.fontsize = v
         }
+        if (hasColumn(nCols, 'fontname')) {
+          const v = getValue(r, nCols, 'fontname')
+          if (v) attrMap.fontname = `"${v}"`
+        }
         if (hasColumn(nCols, 'fixedsize')) {
           const v = getValue(r, nCols, 'fixedsize')
           if (v) attrMap.fixedsize = v === 'true' ? 'true' : v
@@ -624,6 +628,10 @@ export default function DecVizApp() {
             attrs.push(`fontsize="${v}"`)
           }
         }
+        if (hasColumn(nCols, 'fontname')) {
+          const v = getValue(r, nCols, 'fontname')
+          if (v) attrs.push(`fontname="${v}"`)
+        }
         if (hasColumn(nCols, 'fixedsize')) {
           const v = getValue(r, nCols, 'fixedsize')
           const normalizedV = v === 'true' ? 'true' : v
@@ -703,6 +711,18 @@ export default function DecVizApp() {
         if (hasColumn(eCols, 'label')) {
           const v = getValue(r, eCols, 'label')
           if (v) attrs.push(`label="${v}"`)
+        }
+        if (hasColumn(eCols, 'headlabel')) {
+          const v = getValue(r, eCols, 'headlabel')
+          if (v) attrs.push(`headlabel="${v}"`)
+        }
+        if (hasColumn(eCols, 'taillabel')) {
+          const v = getValue(r, eCols, 'taillabel')
+          if (v) attrs.push(`taillabel="${v}"`)
+        }
+        if (hasColumn(eCols, 'fontcolor')) {
+          const v = getValue(r, eCols, 'fontcolor')
+          if (v) attrs.push(`fontcolor="${v}"`)
         }
 
         if (attrs.length > 0) {
@@ -1365,7 +1385,7 @@ export default function DecVizApp() {
                     </div>
                   </div>
                   <div className="flex-1 p-4 overflow-hidden">
-                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden relative">
+                    <div className="h-full rounded-xl bg-slate-50/50 shadow-inner overflow-hidden relative">
                       <LogicaEditor
                         value={domainLanguage}
                         onChange={setDomainLanguage}
@@ -1382,6 +1402,7 @@ Attacks("a", "b");
                           maxHeight: '100%'
                         }}
                         spellCheck={false}
+                        useOverlayHighlighting={false}
                       />
                       {/* Fullscreen Button */}
                       {!isAnyModalOpen && (
@@ -1410,7 +1431,7 @@ Attacks("a", "b");
                     </div>
                   </div>
                   <div className="flex-1 p-4 overflow-hidden">
-                    <div className="h-full rounded-xl border border-slate-200 bg-slate-50/50 shadow-inner overflow-hidden relative">
+                    <div className="h-full rounded-xl bg-slate-50/50 shadow-inner overflow-hidden relative">
                       <LogicaEditor
                         value={visualLanguage}
                         onChange={setVisualLanguage}
@@ -1425,6 +1446,7 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                           maxHeight: '100%'
                         }}
                         spellCheck={false}
+                        useOverlayHighlighting={false}
                       />
                       {/* Fullscreen Button */}
                       {!isAnyModalOpen && (
