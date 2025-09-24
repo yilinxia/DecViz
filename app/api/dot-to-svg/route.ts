@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Graphviz } from '@hpcc-js/wasm'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
     try {
@@ -12,47 +15,27 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // console.log('🔄 API: Converting DOT to SVG using @hpcc-js/wasm')
-        // console.log('📝 API: DOT input:', dot.substring(0, 100) + '...')
-
-        // Use @hpcc-js/wasm for pure JavaScript/WASM graphviz rendering
-        const graphviz = await Graphviz.load()
-
         // Detect layout/engine attribute to select engine (dot, neato, fdp, sfdp, twopi, circo)
-        // Examples: layout=neato; or engine=neato;
-        let engine: any = undefined
+        let engine = 'dot' // default engine
         const layoutMatch = dot.match(/\b(layout|engine)\s*=\s*(\w+)\s*;/)
         if (layoutMatch) {
             const layout = layoutMatch[2].toLowerCase()
-            switch (layout) {
-                case 'dot':
-                    engine = graphviz.layout.dot
-                    break
-                case 'neato':
-                    engine = graphviz.layout.neato
-                    break
-                case 'fdp':
-                    engine = graphviz.layout.fdp
-                    break
-                case 'sfdp':
-                    engine = graphviz.layout.sfdp
-                    break
-                case 'twopi':
-                    engine = graphviz.layout.twopi
-                    break
-                case 'circo':
-                    engine = graphviz.layout.circo
-                    break
+            if (['dot', 'neato', 'fdp', 'sfdp', 'twopi', 'circo'].includes(layout)) {
+                engine = layout
             }
         }
 
-        // Render SVG; if engine is available, use it, otherwise default
-        const svg = engine ? graphviz.layout(dot, 'svg', engine) : graphviz.dot(dot)
+        // Use native Graphviz binary to convert DOT to SVG
+        const { stdout, stderr } = await execAsync(`echo '${dot.replace(/'/g, "'\\''")}' | ${engine} -Tsvg`, {
+            timeout: 10000, // 10 second timeout
+            maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+        })
 
-        // console.log('✅ API: SVG generated successfully, length:', svg.length)
-        // console.log('📄 API: SVG preview:', svg.substring(0, 200) + '...')
+        if (stderr && !stderr.includes('Warning')) {
+            console.error('Graphviz stderr:', stderr)
+        }
 
-        return NextResponse.json({ svg })
+        return NextResponse.json({ svg: stdout })
 
     } catch (error) {
         console.error('❌ API: Error converting DOT to SVG:', error)

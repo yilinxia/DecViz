@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y \
     bash \
     ca-certificates \
     gnupg \
+    graphviz \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -52,11 +53,9 @@ COPY --from=frontend-builder /app/postcss.config.mjs ./
 COPY api/ ./api/
 COPY examples/ ./examples/
 
-# Create a startup script
-RUN echo '#!/bin/sh\n\
-cd /app && python -m uvicorn api.logica_backend:app --host 0.0.0.0 --port 8000 &\n\
-npx next start -p "${PORT:-3000}" --hostname 0.0.0.0\n\
-' > /app/start.sh && chmod +x /app/start.sh
+# Copy startup script
+COPY docker-start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # Expose only the main port (backend is internal)
 EXPOSE 3000

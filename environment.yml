@@ -3,6 +3,10 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  # Python
+  - python=3.11
+  - pip
+  
   # Node.js (npm comes bundled with Node.js)
   - nodejs=20.19.4
   
@@ -10,6 +14,7 @@ dependencies:
   - git
   - curl
   - make
+  - graphviz
 
 # Environment variables
 variables:
