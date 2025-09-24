@@ -46,6 +46,7 @@ def run_logica_predicate(file_path: str, predicate: str) -> tuple[list[str], lis
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
         
         if proc.returncode != 0:
+            print(f"Error running {predicate}: {proc.stderr.strip()}")
             return [], [], proc.stderr.strip()
 
         # Parse ASCII table output
@@ -110,6 +111,12 @@ def execute_logica_program(program: str, predicates: list[str]) -> dict:
             
             if error:
                 print(f"Warning: {predicate} failed - {error}")
+                # For Ranking predicate, try to provide some fallback data
+                if predicate == "Ranking":
+                    print(f"Ranking predicate failed, providing empty results")
+                    results[predicate] = {"columns": ["len", "samerank"], "rows": []}
+                else:
+                    results[predicate] = {"columns": [], "rows": []}
         
         return results
     finally:
@@ -153,14 +160,14 @@ async def execute_logica(payload: ExecutePayload):
         program = build_program(payload.domainLanguage, payload.visualLanguage)
         
         # Execute predicates
-        tables = execute_logica_program(program, ["Graph", "Node", "Edge"])
-
+        tables = execute_logica_program(program, ["Graph", "Node", "Edge", "Ranking"])
         return JSONResponse({
             "status": "OK",
             "tables": tables,
             "graph": tables.get("Graph", {"columns": [], "rows": []}),
             "node": tables.get("Node", {"columns": [], "rows": []}),
             "edge": tables.get("Edge", {"columns": [], "rows": []}),
+            "ranking": tables.get("Ranking", {"columns": [], "rows": []}),
         })
 
     except Exception as e:

@@ -63,6 +63,8 @@ export default function DecVizApp() {
   const [graphError, setGraphError] = useState<string>("")
   const [nodeError, setNodeError] = useState<string>("")
   const [edgeError, setEdgeError] = useState<string>("")
+  const [rankingStatus, setRankingStatus] = useState<string>("")
+  const [rankingError, setRankingError] = useState<string>("")
   const [lockedViewportHeight, setLockedViewportHeight] = useState<number | null>(null)
   const [dotCopied, setDotCopied] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
@@ -328,9 +330,11 @@ export default function DecVizApp() {
       setGraphStatus("OK")
       setNodeStatus("OK")
       setEdgeStatus("OK")
+      setRankingStatus("OK")
       setGraphError("")
       setNodeError("")
       setEdgeError("")
+      setRankingError("")
 
       // Return for history recording
       return { dot, results }
@@ -351,10 +355,12 @@ export default function DecVizApp() {
   const compileToDot = (results: any): string => {
     let dot = 'digraph G {\n'
 
-    // Graph properties
+    // Graph properties - all optional, only include if user provides them
     if (results.graph?.rows?.length) {
       const gRow = results.graph.rows[0]
       const gCols = results.graph.columns
+
+      // Only include properties that exist in the columns and have values
       if (hasColumn(gCols, 'rankdir')) {
         const rankdir = getValue(gRow, gCols, 'rankdir')
         if (rankdir) dot += `  rankdir=${rankdir};\n`
@@ -367,9 +373,144 @@ export default function DecVizApp() {
         const engine = getValue(gRow, gCols, 'engine')
         if (engine) dot += `  layout=${engine};\n`
       }
-    } else {
-      dot += '  rankdir=TB;\n'
+      // Additional DOT graph attributes
+      if (hasColumn(gCols, 'bgcolor')) {
+        const bgcolor = getValue(gRow, gCols, 'bgcolor')
+        if (bgcolor) dot += `  bgcolor="${bgcolor}";\n`
+      }
+      if (hasColumn(gCols, 'fontname')) {
+        const fontname = getValue(gRow, gCols, 'fontname')
+        if (fontname) dot += `  fontname="${fontname}";\n`
+      }
+      if (hasColumn(gCols, 'fontsize')) {
+        const fontsize = getValue(gRow, gCols, 'fontsize')
+        if (fontsize) dot += `  fontsize=${fontsize};\n`
+      }
+      if (hasColumn(gCols, 'fontcolor')) {
+        const fontcolor = getValue(gRow, gCols, 'fontcolor')
+        if (fontcolor) dot += `  fontcolor="${fontcolor}";\n`
+      }
+      if (hasColumn(gCols, 'splines')) {
+        const splines = getValue(gRow, gCols, 'splines')
+        if (splines) dot += `  splines=${splines};\n`
+      }
+      if (hasColumn(gCols, 'overlap')) {
+        const overlap = getValue(gRow, gCols, 'overlap')
+        if (overlap) dot += `  overlap=${overlap};\n`
+      }
+      if (hasColumn(gCols, 'sep')) {
+        const sep = getValue(gRow, gCols, 'sep')
+        if (sep) dot += `  sep=${sep};\n`
+      }
+      if (hasColumn(gCols, 'margin')) {
+        const margin = getValue(gRow, gCols, 'margin')
+        if (margin) dot += `  margin=${margin};\n`
+      }
+      if (hasColumn(gCols, 'pad')) {
+        const pad = getValue(gRow, gCols, 'pad')
+        if (pad) dot += `  pad=${pad};\n`
+      }
+      if (hasColumn(gCols, 'dpi')) {
+        const dpi = getValue(gRow, gCols, 'dpi')
+        if (dpi) dot += `  dpi=${dpi};\n`
+      }
+      if (hasColumn(gCols, 'size')) {
+        const size = getValue(gRow, gCols, 'size')
+        if (size) dot += `  size="${size}";\n`
+      }
+      if (hasColumn(gCols, 'ratio')) {
+        const ratio = getValue(gRow, gCols, 'ratio')
+        if (ratio) dot += `  ratio=${ratio};\n`
+      }
+      if (hasColumn(gCols, 'concentrate')) {
+        const concentrate = getValue(gRow, gCols, 'concentrate')
+        if (concentrate) dot += `  concentrate=${concentrate};\n`
+      }
+      if (hasColumn(gCols, 'compound')) {
+        const compound = getValue(gRow, gCols, 'compound')
+        if (compound) dot += `  compound=${compound};\n`
+      }
+      if (hasColumn(gCols, 'nodesep')) {
+        const nodesep = getValue(gRow, gCols, 'nodesep')
+        if (nodesep) dot += `  nodesep=${nodesep};\n`
+      }
+      if (hasColumn(gCols, 'ranksep')) {
+        const ranksep = getValue(gRow, gCols, 'ranksep')
+        if (ranksep) dot += `  ranksep=${ranksep};\n`
+      }
+      if (hasColumn(gCols, 'esep')) {
+        const esep = getValue(gRow, gCols, 'esep')
+        if (esep) dot += `  esep=${esep};\n`
+      }
+      if (hasColumn(gCols, 'ordering')) {
+        const ordering = getValue(gRow, gCols, 'ordering')
+        if (ordering) dot += `  ordering=${ordering};\n`
+      }
+      if (hasColumn(gCols, 'outputorder')) {
+        const outputorder = getValue(gRow, gCols, 'outputorder')
+        if (outputorder) dot += `  outputorder=${outputorder};\n`
+      }
+      if (hasColumn(gCols, 'pack')) {
+        const pack = getValue(gRow, gCols, 'pack')
+        if (pack) dot += `  pack=${pack};\n`
+      }
+      if (hasColumn(gCols, 'packmode')) {
+        const packmode = getValue(gRow, gCols, 'packmode')
+        if (packmode) dot += `  packmode=${packmode};\n`
+      }
+      if (hasColumn(gCols, 'remincross')) {
+        const remincross = getValue(gRow, gCols, 'remincross')
+        if (remincross) dot += `  remincross=${remincross};\n`
+      }
+      if (hasColumn(gCols, 'searchsize')) {
+        const searchsize = getValue(gRow, gCols, 'searchsize')
+        if (searchsize) dot += `  searchsize=${searchsize};\n`
+      }
+      if (hasColumn(gCols, 'style')) {
+        const style = getValue(gRow, gCols, 'style')
+        if (style) dot += `  style="${style}";\n`
+      }
+      if (hasColumn(gCols, 'truecolor')) {
+        const truecolor = getValue(gRow, gCols, 'truecolor')
+        if (truecolor) dot += `  truecolor=${truecolor};\n`
+      }
+      if (hasColumn(gCols, 'viewport')) {
+        const viewport = getValue(gRow, gCols, 'viewport')
+        if (viewport) dot += `  viewport="${viewport}";\n`
+      }
+      if (hasColumn(gCols, 'xdotversion')) {
+        const xdotversion = getValue(gRow, gCols, 'xdotversion')
+        if (xdotversion) dot += `  xdotversion="${xdotversion}";\n`
+      }
+      // Handle explicit ranking (ranks attribute)
+      if (hasColumn(gCols, 'ranks')) {
+        const ranks = getValue(gRow, gCols, 'ranks')
+        if (ranks) {
+          // Parse ranks string like "same A B C; same D E F"
+          const rankGroups = ranks.split(';').map(group => group.trim()).filter(group => group)
+          rankGroups.forEach(group => {
+            if (group.startsWith('same ')) {
+              const nodes = group.substring(5).trim().split(/\s+/).filter(node => node)
+              if (nodes.length > 0) {
+                dot += `  {rank = same ${nodes.join(' ')}}\n`
+              }
+            } else if (group.startsWith('min ')) {
+              const nodes = group.substring(4).trim().split(/\s+/).filter(node => node)
+              if (nodes.length > 0) {
+                dot += `  {rank = min ${nodes.join(' ')}}\n`
+              }
+            } else if (group.startsWith('max ')) {
+              const nodes = group.substring(4).trim().split(/\s+/).filter(node => node)
+              if (nodes.length > 0) {
+                dot += `  {rank = max ${nodes.join(' ')}}\n`
+              }
+            }
+          })
+        }
+      }
+      // Note: id attribute is not standard DOT syntax, skipping it
     }
+    // No fallback defaults - all graph attributes are optional
 
     // Extract common node attributes
     if (results.nodes?.rows?.length) {
@@ -527,80 +668,37 @@ export default function DecVizApp() {
       })
     }
 
-    // Extract common edge attributes
+    // Edge attributes - NO aggregation, each edge keeps its own attributes
     if (results.edges?.rows?.length) {
       const eCols = results.edges.columns
-      const commonEdgeAttrs = new Map<string, string>()
 
-      // First pass: find common attributes
-      results.edges.rows.forEach((r: string[]) => {
-        const attrMap: Record<string, string> = {}
-        if (hasColumn(eCols, 'color')) {
-          const v = getValue(r, eCols, 'color')
-          if (v) attrMap.color = `"${v}"`
-        }
-        if (hasColumn(eCols, 'style')) {
-          const v = getValue(r, eCols, 'style')
-          if (v) attrMap.style = `"${v}"`
-        }
-        if (hasColumn(eCols, 'arrowhead')) {
-          const v = getValue(r, eCols, 'arrowhead')
-          if (v) attrMap.arrowhead = `"${v}"`
-        }
-        if (hasColumn(eCols, 'arrowtail')) {
-          const v = getValue(r, eCols, 'arrowtail')
-          if (v) attrMap.arrowtail = `"${v}"`
-        }
-
-        Object.entries(attrMap).forEach(([key, value]) => {
-          if (!commonEdgeAttrs.has(key)) {
-            commonEdgeAttrs.set(key, value)
-          } else if (commonEdgeAttrs.get(key) !== value) {
-            commonEdgeAttrs.delete(key)
-          }
-        })
-      })
-
-      // Output common edge attributes
-      if (commonEdgeAttrs.size > 0) {
-        dot += '\n  edge [\n'
-        Array.from(commonEdgeAttrs.entries()).forEach(([key, value]) => {
-          dot += `    ${key}=${value}\n`
-        })
-        dot += '  ];\n'
-      }
-
-      // Output edges
+      // Output edges directly without any aggregation
       dot += '\n'
       results.edges.rows.forEach((r: string[]) => {
         const s = getValue(r, eCols, 'source_id') || 'unknown'
         const t = getValue(r, eCols, 'target_id') || 'unknown'
         const attrs: string[] = []
 
-        // Add non-common attributes
+        // Add all attributes individually for each edge
         if (hasColumn(eCols, 'color')) {
           const v = getValue(r, eCols, 'color')
-          if (v && (!commonEdgeAttrs.has('color') || commonEdgeAttrs.get('color') !== `"${v}"`)) {
-            attrs.push(`color="${v}"`)
-          }
+          if (v) attrs.push(`color="${v}"`)
         }
         if (hasColumn(eCols, 'style')) {
           const v = getValue(r, eCols, 'style')
-          if (v && (!commonEdgeAttrs.has('style') || commonEdgeAttrs.get('style') !== `"${v}"`)) {
-            attrs.push(`style="${v}"`)
-          }
+          if (v) attrs.push(`style="${v}"`)
+        }
+        if (hasColumn(eCols, 'dir')) {
+          const v = getValue(r, eCols, 'dir')
+          if (v) attrs.push(`dir="${v}"`)
         }
         if (hasColumn(eCols, 'arrowhead')) {
           const v = getValue(r, eCols, 'arrowhead')
-          if (v && (!commonEdgeAttrs.has('arrowhead') || commonEdgeAttrs.get('arrowhead') !== `"${v}"`)) {
-            attrs.push(`arrowhead="${v}"`)
-          }
+          if (v) attrs.push(`arrowhead="${v}"`)
         }
         if (hasColumn(eCols, 'arrowtail')) {
           const v = getValue(r, eCols, 'arrowtail')
-          if (v && (!commonEdgeAttrs.has('arrowtail') || commonEdgeAttrs.get('arrowtail') !== `"${v}"`)) {
-            attrs.push(`arrowtail="${v}"`)
-          }
+          if (v) attrs.push(`arrowtail="${v}"`)
         }
         if (hasColumn(eCols, 'label')) {
           const v = getValue(r, eCols, 'label')
@@ -611,6 +709,48 @@ export default function DecVizApp() {
           dot += `  "${s}" -> "${t}" [${attrs.join(', ')}];\n`
         } else {
           dot += `  "${s}" -> "${t}";\n`
+        }
+      })
+    }
+
+    // Add ranking constraints from Ranking table
+    if (results.ranking?.rows?.length) {
+      const rCols = results.ranking.columns
+
+      dot += '\n'
+      results.ranking.rows.forEach((r: string[]) => {
+        const len = getValue(r, rCols, 'len') || ''
+        const samerank = getValue(r, rCols, 'samerank') || ''
+
+        if (samerank) {
+          // Parse the samerank list (could be JSON array, ARRAY_AGG output, or comma-separated)
+          try {
+            // Try JSON first
+            const nodes = JSON.parse(samerank)
+            if (Array.isArray(nodes) && nodes.length > 0) {
+              // Clean up quoted strings (remove extra quotes)
+              const cleanNodes = nodes.map(node => node.replace(/^"|"$/g, ''))
+              dot += `  { rank=same; ${cleanNodes.join('; ')}; }\n`
+            }
+          } catch (e) {
+            // Try parsing as Python list string (e.g., "['T', 'A']")
+            try {
+              const pythonListMatch = samerank.match(/\[(.*?)\]/)
+              if (pythonListMatch) {
+                const listContent = pythonListMatch[1]
+                const nodes = listContent.split(',').map(n => n.trim().replace(/^'|'$/g, '').replace(/^"|"$/g, '')).filter(n => n)
+                if (nodes.length > 0) {
+                  dot += `  { rank=same; ${nodes.join('; ')}; }\n`
+                }
+              }
+            } catch (e2) {
+              // If not Python list, try parsing as comma-separated values
+              const nodes = samerank.split(',').map(n => n.trim()).filter(n => n)
+              if (nodes.length > 0) {
+                dot += `  { rank=same; ${nodes.join('; ')}; }\n`
+              }
+            }
+          }
         }
       })
     }
@@ -634,7 +774,7 @@ export default function DecVizApp() {
 
     // Join program (engine is injected by worker)
     const program = `${domain}\n\n${visual}`
-    const worker = globalWorker
+    const worker: Worker = (globalThis as any).globalWorker as Worker
 
     // Helper: parse HTML table returned by worker to {columns, rows}
     const parseAsciiTable = (text: string): { columns: string[]; rows: string[][] } => {
@@ -705,7 +845,8 @@ export default function DecVizApp() {
     }
 
     // Helper: run a predicate via worker
-    const runPredicate = (predicate: string): Promise<{ status: string; result: string; error?: string }> => {
+    type RunResult = { status: string; result: string; error?: string }
+    const runPredicate = (predicate: string): Promise<RunResult> => {
       return new Promise((resolve, reject) => {
         const onMessage = (event: MessageEvent) => {
           const data = event.data
@@ -730,10 +871,11 @@ export default function DecVizApp() {
 
     try {
       // Run predicates
-      const [graphRes, nodeRes, edgeRes] = await Promise.all([
-        runPredicate('Graph').catch(() => ({ status: 'error', result: '' })),
-        runPredicate('Node'),
-        runPredicate('Edge'),
+      const [graphRes, nodeRes, edgeRes, rankingRes] = await Promise.all<RunResult>([
+        runPredicate('Graph').catch(() => ({ status: 'error', result: '', error: 'Graph failed' })),
+        runPredicate('Node').catch(() => ({ status: 'error', result: '', error: 'Node failed' })),
+        runPredicate('Edge').catch(() => ({ status: 'error', result: '', error: 'Edge failed' })),
+        runPredicate('Ranking').catch(() => ({ status: 'error', result: '', error: 'Ranking failed' })),
       ])
 
       // console.log('🔎 Worker results:', {
@@ -746,6 +888,7 @@ export default function DecVizApp() {
         graph: graphRes.status === 'OK' ? parseHtmlTable(graphRes.result) : { columns: [], rows: [] },
         nodes: nodeRes.status === 'OK' ? parseHtmlTable(nodeRes.result) : { columns: [], rows: [] },
         edges: edgeRes.status === 'OK' ? parseHtmlTable(edgeRes.result) : { columns: [], rows: [] },
+        ranking: rankingRes.status === 'OK' ? parseHtmlTable(rankingRes.result) : { columns: [], rows: [] },
       }
       setRawGraphResult(graphRes.result || '')
       setRawNodeResult(nodeRes.result || '')
@@ -756,6 +899,10 @@ export default function DecVizApp() {
       setGraphError(graphRes.error || '')
       setNodeError(nodeRes.error || '')
       setEdgeError(edgeRes.error || '')
+      setRankingStatus(rankingRes.status)
+      setRankingError(rankingRes.error || '')
+      setRankingStatus(rankingRes.status)
+      setRankingError(rankingRes.error || '')
 
       // console.log('🧩 Parsed results:', results)
 
@@ -1376,6 +1523,11 @@ Edge(source_id: source, target_id: target, color: \"black\", style: \"solid\", a
                               title="Edge"
                               data={logicaResults?.edges}
                               status={edgeStatus}
+                            />
+                            <DataFrameTable
+                              title="Ranking"
+                              data={logicaResults?.ranking}
+                              status={rankingStatus}
                             />
                           </div>
                         </DialogContent>

@@ -461,7 +461,8 @@ function evaluateLogicaDirectly(rules: LogicaRule[]): any {
     const results: any = {
         graph: { columns: [], rows: [] },
         nodes: { columns: [], rows: [] },
-        edges: { columns: [], rows: [] }
+        edges: { columns: [], rows: [] },
+        ranking: { columns: [], rows: [] }
     }
 
     // Extract facts
@@ -564,6 +565,42 @@ function evaluateLogicaDirectly(rules: LogicaRule[]): any {
         }
     }
 
+    // Process Ranking predicate
+    const rankingRules = rules.filter(rule => rule.head.predicate === 'Ranking' && !rule.isFact)
+    if (rankingRules.length > 0) {
+        const rankingRule = rankingRules[0]
+        const bodyPredicate = rankingRule.body[0].predicate
+        const bodyArgs = rankingRule.body[0].args
+
+        if (facts.has(bodyPredicate)) {
+            const bodyFacts = facts.get(bodyPredicate)!
+            const rankingResults = bodyFacts.map(fact => {
+                const result: any = {}
+                for (const headArg of rankingRule.head.args) {
+                    if (typeof headArg === 'object' && headArg.name) {
+                        // Check if this is a variable reference by seeing if it matches any body argument
+                        const varIndex = bodyArgs.indexOf(headArg.value)
+                        if (varIndex >= 0) {
+                            // Variable reference - substitute with actual value
+                            result[headArg.name] = fact[varIndex]
+                        } else {
+                            // Literal value - use as is
+                            result[headArg.name] = headArg.value
+                        }
+                    }
+                }
+                return result
+            })
+
+            if (rankingResults.length > 0) {
+                results.ranking = {
+                    columns: Object.keys(rankingResults[0]),
+                    rows: rankingResults.map(row => Object.values(row))
+                }
+            }
+        }
+    }
+
     return results
 }
 
@@ -596,7 +633,8 @@ function parseLogicaSimple(logicaContent: string): any {
     const results: any = {
         graph: { columns: [], rows: [] },
         nodes: { columns: [], rows: [] },
-        edges: { columns: [], rows: [] }
+        edges: { columns: [], rows: [] },
+        ranking: { columns: [], rows: [] }
     }
 
     // Parse the Logica content line by line
@@ -640,6 +678,21 @@ function parseLogicaSimple(logicaContent: string): any {
                     results.edges = {
                         columns: Object.keys(edgeResults[0]),
                         rows: edgeResults.map(row => Object.values(row))
+                    }
+                }
+            }
+        }
+
+        // Parse Ranking definitions with rules
+        if (line.match(/^Ranking\s*\(/)) {
+            const rankingAttrs = parseLogicaPredicate(line, 'Ranking')
+            if (rankingAttrs) {
+                // This is a rule definition, we need to evaluate it
+                const rankingResults = evaluateRankingRule(line, logicaContent)
+                if (rankingResults.length > 0) {
+                    results.ranking = {
+                        columns: Object.keys(rankingResults[0]),
+                        rows: rankingResults.map(row => Object.values(row))
                     }
                 }
             }
@@ -767,6 +820,50 @@ function evaluateEdgeRule(edgeRule: string, logicaContent: string): any[] {
     return results
 }
 
+// Evaluate Ranking rule (e.g., Ranking(len: l, samerank: x) :- Len(argu: x, len: l))
+function evaluateRankingRule(rankingRule: string, logicaContent: string): any[] {
+    const results: any[] = []
+
+    // Extract the rule condition (after :-)
+    const ruleMatch = rankingRule.match(/:-([^;]+)/)
+    if (!ruleMatch) return results
+
+    const condition = ruleMatch[1].trim()
+
+    // Parse the condition to find what predicate to look for
+    const conditionMatch = condition.match(/^([^(]+)\s*\(([^)]+)\)/)
+    if (!conditionMatch) return results
+
+    const predicateName = conditionMatch[1].trim()
+    const predicateArgs = conditionMatch[2].split(',').map(arg => arg.trim())
+
+    // Find all instances of this predicate in the content
+    const predicateInstances = findPredicateInstances(logicaContent, predicateName)
+
+    // For each instance, create a ranking result
+    for (const instance of predicateInstances) {
+        const rankingAttrs = parseLogicaPredicate(rankingRule, 'Ranking')
+        if (rankingAttrs) {
+            const result: any = {}
+
+            // Map variables to actual values
+            for (const [key, value] of Object.entries(rankingAttrs)) {
+                if (typeof value === 'string' && predicateArgs.includes(value)) {
+                    // This is a variable, substitute with actual value
+                    const argIndex = predicateArgs.indexOf(value)
+                    result[key] = instance[argIndex]
+                } else {
+                    result[key] = value
+                }
+            }
+
+            results.push(result)
+        }
+    }
+
+    return results
+}
+
 // Find all instances of a predicate in the Logica content
 function findPredicateInstances(logicaContent: string, predicateName: string): string[][] {
     const instances: string[][] = []
@@ -795,12 +892,12 @@ function findPredicateInstances(logicaContent: string, predicateName: string): s
 function compileToGraphviz(results: any): string {
     let dot = 'digraph G {\n'
 
-    // Add graph properties from Graph table
+    // Add graph properties from Graph table - all optional, only include if user provides them
     if (results.graph && results.graph.rows && results.graph.rows.length > 0) {
         const graphRow = results.graph.rows[0]
         const columns = results.graph.columns
 
-        // Only include properties that exist in the columns
+        // Only include properties that exist in the columns and have values
         if (hasColumn(columns, 'rankdir')) {
             const rankdir = getValueByColumn(graphRow, columns, 'rankdir')
             if (rankdir) dot += `  rankdir=${rankdir};\n`
@@ -814,11 +911,144 @@ function compileToGraphviz(results: any): string {
             const engine = getValueByColumn(graphRow, columns, 'engine')
             if (engine) dot += `  layout=${engine};\n`
         }
+        // Additional DOT graph attributes
+        if (hasColumn(columns, 'bgcolor')) {
+            const bgcolor = getValueByColumn(graphRow, columns, 'bgcolor')
+            if (bgcolor) dot += `  bgcolor="${bgcolor}";\n`
+        }
+        if (hasColumn(columns, 'fontname')) {
+            const fontname = getValueByColumn(graphRow, columns, 'fontname')
+            if (fontname) dot += `  fontname="${fontname}";\n`
+        }
+        if (hasColumn(columns, 'fontsize')) {
+            const fontsize = getValueByColumn(graphRow, columns, 'fontsize')
+            if (fontsize) dot += `  fontsize=${fontsize};\n`
+        }
+        if (hasColumn(columns, 'fontcolor')) {
+            const fontcolor = getValueByColumn(graphRow, columns, 'fontcolor')
+            if (fontcolor) dot += `  fontcolor="${fontcolor}";\n`
+        }
+        if (hasColumn(columns, 'splines')) {
+            const splines = getValueByColumn(graphRow, columns, 'splines')
+            if (splines) dot += `  splines=${splines};\n`
+        }
+        if (hasColumn(columns, 'overlap')) {
+            const overlap = getValueByColumn(graphRow, columns, 'overlap')
+            if (overlap) dot += `  overlap=${overlap};\n`
+        }
+        if (hasColumn(columns, 'sep')) {
+            const sep = getValueByColumn(graphRow, columns, 'sep')
+            if (sep) dot += `  sep=${sep};\n`
+        }
+        if (hasColumn(columns, 'margin')) {
+            const margin = getValueByColumn(graphRow, columns, 'margin')
+            if (margin) dot += `  margin=${margin};\n`
+        }
+        if (hasColumn(columns, 'pad')) {
+            const pad = getValueByColumn(graphRow, columns, 'pad')
+            if (pad) dot += `  pad=${pad};\n`
+        }
+        if (hasColumn(columns, 'dpi')) {
+            const dpi = getValueByColumn(graphRow, columns, 'dpi')
+            if (dpi) dot += `  dpi=${dpi};\n`
+        }
+        if (hasColumn(columns, 'size')) {
+            const size = getValueByColumn(graphRow, columns, 'size')
+            if (size) dot += `  size="${size}";\n`
+        }
+        if (hasColumn(columns, 'ratio')) {
+            const ratio = getValueByColumn(graphRow, columns, 'ratio')
+            if (ratio) dot += `  ratio=${ratio};\n`
+        }
+        if (hasColumn(columns, 'concentrate')) {
+            const concentrate = getValueByColumn(graphRow, columns, 'concentrate')
+            if (concentrate) dot += `  concentrate=${concentrate};\n`
+        }
+        if (hasColumn(columns, 'compound')) {
+            const compound = getValueByColumn(graphRow, columns, 'compound')
+            if (compound) dot += `  compound=${compound};\n`
+        }
+        if (hasColumn(columns, 'nodesep')) {
+            const nodesep = getValueByColumn(graphRow, columns, 'nodesep')
+            if (nodesep) dot += `  nodesep=${nodesep};\n`
+        }
+        if (hasColumn(columns, 'ranksep')) {
+            const ranksep = getValueByColumn(graphRow, columns, 'ranksep')
+            if (ranksep) dot += `  ranksep=${ranksep};\n`
+        }
+        if (hasColumn(columns, 'esep')) {
+            const esep = getValueByColumn(graphRow, columns, 'esep')
+            if (esep) dot += `  esep=${esep};\n`
+        }
+        if (hasColumn(columns, 'ordering')) {
+            const ordering = getValueByColumn(graphRow, columns, 'ordering')
+            if (ordering) dot += `  ordering=${ordering};\n`
+        }
+        if (hasColumn(columns, 'outputorder')) {
+            const outputorder = getValueByColumn(graphRow, columns, 'outputorder')
+            if (outputorder) dot += `  outputorder=${outputorder};\n`
+        }
+        if (hasColumn(columns, 'pack')) {
+            const pack = getValueByColumn(graphRow, columns, 'pack')
+            if (pack) dot += `  pack=${pack};\n`
+        }
+        if (hasColumn(columns, 'packmode')) {
+            const packmode = getValueByColumn(graphRow, columns, 'packmode')
+            if (packmode) dot += `  packmode=${packmode};\n`
+        }
+        if (hasColumn(columns, 'remincross')) {
+            const remincross = getValueByColumn(graphRow, columns, 'remincross')
+            if (remincross) dot += `  remincross=${remincross};\n`
+        }
+        if (hasColumn(columns, 'searchsize')) {
+            const searchsize = getValueByColumn(graphRow, columns, 'searchsize')
+            if (searchsize) dot += `  searchsize=${searchsize};\n`
+        }
+        if (hasColumn(columns, 'style')) {
+            const style = getValueByColumn(graphRow, columns, 'style')
+            if (style) dot += `  style="${style}";\n`
+        }
+        if (hasColumn(columns, 'truecolor')) {
+            const truecolor = getValueByColumn(graphRow, columns, 'truecolor')
+            if (truecolor) dot += `  truecolor=${truecolor};\n`
+        }
+        if (hasColumn(columns, 'viewport')) {
+            const viewport = getValueByColumn(graphRow, columns, 'viewport')
+            if (viewport) dot += `  viewport="${viewport}";\n`
+        }
+        if (hasColumn(columns, 'xdotversion')) {
+            const xdotversion = getValueByColumn(graphRow, columns, 'xdotversion')
+            if (xdotversion) dot += `  xdotversion="${xdotversion}";\n`
+        }
+        // Handle explicit ranking (ranks attribute)
+        if (hasColumn(columns, 'ranks')) {
+            const ranks = getValueByColumn(graphRow, columns, 'ranks')
+            if (ranks) {
+                // Parse ranks string like "same A B C; same D E F"
+                const rankGroups = ranks.split(';').map(group => group.trim()).filter(group => group)
+                rankGroups.forEach(group => {
+                    if (group.startsWith('same ')) {
+                        const nodes = group.substring(5).trim().split(/\s+/).filter(node => node)
+                        if (nodes.length > 0) {
+                            dot += `  {rank = same ${nodes.join(' ')}}\n`
+                        }
+                    } else if (group.startsWith('min ')) {
+                        const nodes = group.substring(4).trim().split(/\s+/).filter(node => node)
+                        if (nodes.length > 0) {
+                            dot += `  {rank = min ${nodes.join(' ')}}\n`
+                        }
+                    } else if (group.startsWith('max ')) {
+                        const nodes = group.substring(4).trim().split(/\s+/).filter(node => node)
+                        if (nodes.length > 0) {
+                            dot += `  {rank = max ${nodes.join(' ')}}\n`
+                        }
+                    }
+                })
+            }
+        }
         // Note: id attribute is not standard DOT syntax, skipping it
-    } else {
-        // Default values only if no graph table exists
-        dot += '  rankdir=TB;\n'
     }
+    // No fallback defaults - all graph attributes are optional
 
     // Add nodes from Node table
     if (results.nodes && results.nodes.rows && results.nodes.rows.length > 0) {
@@ -903,6 +1133,48 @@ function compileToGraphviz(results: any): string {
         dot += '\n'
     }
 
+    // Add ranking constraints from Ranking table
+    if (results.ranking && results.ranking.rows && results.ranking.rows.length > 0) {
+        const columns = results.ranking.columns
+
+        dot += '\n'
+        results.ranking.rows.forEach((rankingRow: any[]) => {
+            const len = getValueByColumn(rankingRow, columns, 'len') || ''
+            const samerank = getValueByColumn(rankingRow, columns, 'samerank') || ''
+
+            if (samerank) {
+                // Parse the samerank list (could be JSON array, ARRAY_AGG output, or comma-separated)
+                try {
+                    // Try JSON first
+                    const nodes = JSON.parse(samerank)
+                    if (Array.isArray(nodes) && nodes.length > 0) {
+                        // Clean up quoted strings (remove extra quotes)
+                        const cleanNodes = nodes.map(node => node.replace(/^"|"$/g, ''))
+                        dot += `  { rank=same; ${cleanNodes.join('; ')}; }\n`
+                    }
+                } catch (e) {
+                    // Try parsing as Python list string (e.g., "['T', 'A']")
+                    try {
+                        const pythonListMatch = samerank.match(/\[(.*?)\]/)
+                        if (pythonListMatch) {
+                            const listContent = pythonListMatch[1]
+                            const nodes = listContent.split(',').map(n => n.trim().replace(/^'|'$/g, '').replace(/^"|"$/g, '')).filter(n => n)
+                            if (nodes.length > 0) {
+                                dot += `  { rank=same; ${nodes.join('; ')}; }\n`
+                            }
+                        }
+                    } catch (e2) {
+                        // If not Python list, try parsing as comma-separated values
+                        const nodes = samerank.split(',').map(n => n.trim()).filter(n => n)
+                        if (nodes.length > 0) {
+                            dot += `  { rank=same; ${nodes.join('; ')}; }\n`
+                        }
+                    }
+                }
+            }
+        })
+    }
+
     // Add edges from Edge table
     if (results.edges && results.edges.rows && results.edges.rows.length > 0) {
         const columns = results.edges.columns
@@ -920,6 +1192,10 @@ function compileToGraphviz(results: any): string {
             if (hasColumn(columns, 'style')) {
                 const style = getValueByColumn(edgeRow, columns, 'style')
                 if (style) attrs.push(`style="${style}"`)
+            }
+            if (hasColumn(columns, 'dir')) {
+                const dir = getValueByColumn(edgeRow, columns, 'dir')
+                if (dir) attrs.push(`dir="${dir}"`)
             }
             if (hasColumn(columns, 'arrowhead')) {
                 const arrowhead = getValueByColumn(edgeRow, columns, 'arrowhead')

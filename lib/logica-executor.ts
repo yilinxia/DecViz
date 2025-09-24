@@ -20,8 +20,9 @@ export async function executeLogica(domainLanguage: string, visualLanguage: stri
         const graph = tables.Graph || data.graph || { columns: [], rows: [] };
         const nodes = tables.Node || data.node || { columns: [], rows: [] };
         const edges = tables.Edge || data.edge || { columns: [], rows: [] };
+        const ranking = tables.Ranking || data.ranking || { columns: [], rows: [] };
 
-        return { graph, nodes, edges };
+        return { graph, nodes, edges, ranking };
     } catch (error: any) {
         // Keep a single concise error path
         throw new Error(`Failed to load Logica code: ${error.message}`);
